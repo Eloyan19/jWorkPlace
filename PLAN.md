@@ -116,6 +116,9 @@ redeploy-инструкция в `deploy/README.md` воспроизводима
   (gitleaks-подобно): чужой `.env`/ключи не должны попасть в эмбеддинги/индекс/логи; клон с
   `-c core.hooksPath=/dev/null` (git-хуки чужого репо не исполняем); валидация входной GitHub-ссылки
   (SSRF/локальные пути/размер).
+- `security-auditor` — **защита публичного URL (микро-решение к 1a):** сервис single-user и открыт по
+  ссылке → решить, закрывать ли `jwork.jorchik.com` простым Bearer-токеном в nginx (паттерн
+  `llm.jorchik.com`), чтобы чужие не жгли ключ DeepSeek и не запускали индексацию произвольных репо.
 - `backend-developer` — модуль клонирования:
   `git clone --depth 1 --filter=blob:none -c core.hooksPath=/dev/null <url>
   $JWP_DATA_DIR/repos/<project-id>/`; таймаут; отсев больших файлов.
