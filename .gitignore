@@ -1,0 +1,39 @@
+# --- Секреты (НИКОГДА в git) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Данные рантайма (клоны репо + FAISS-индексы + SQLite) ---
+# $JWP_DATA_DIR по умолчанию вне репо (/var/lib/jworkplace), но на случай локального переопределения:
+/data/
+*.sqlite
+*.sqlite3
+*.db
+
+# --- Python (backend / индексатор) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node / фронт (Vite + React) ---
+node_modules/
+dist/
+.vite/
+*.local
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Claude Code (личные настройки — не в git; .claude/agents/ и settings.json коммитим) ---
+.claude/settings.local.json
+.claude/settings.local.json*
+.claude/*.tmp.*
