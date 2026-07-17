@@ -34,7 +34,7 @@ git-дерева (напр. `/var/lib/jworkplace`).
 
 | Этап | Цель | Главный результат по `https://jwork.jorchik.com` |
 |---|---|---|
-| **0** | Walking skeleton + деплой-пайплайн | Открывается страница; `/api/health` отвечает `ok` по HTTPS |
+| **0 ✅** | Walking skeleton + деплой-пайплайн | **Сделано:** страница + `/api/health`→`ok` живут по HTTPS на `jwork.jorchik.com` |
 | **1** | Индексация репо (RAG-хранилище) | Вставил ссылку на GitHub → проект индексируется, появляется в списке, переключается |
 | **2** | Grounded-чат по коду | Задал вопрос по проекту → grounded-ответ с источниками `file::symbol::строки` + гейт «не знаю» |
 | **3** | Правки + Pull Request | Попросил правку → предложенный diff → подтвердил → создан реальный PR (ссылка) |
@@ -48,6 +48,11 @@ git-дерева (напр. `/var/lib/jworkplace`).
 ---
 
 ## Этап 0 — Walking skeleton + деплой-пайплайн
+
+> ✅ **ВЫПОЛНЕНО 2026-07-17** (коммит `bf1ce87`). Живой `https://jwork.jorchik.com/api/health`→`ok`,
+> TLS (certbot, авто-renew), HTTP→HTTPS 301, `jworkplace.service` active+enabled. Прошли ARCHITECT +
+> backend/frontend-developer + SECURITY_AUDITOR (9/9 OK) + `/code-review`. Деплой-пайплайн отлажен и
+> переиспользуется дальше (см. `deploy/README.md` → «Redeploy»).
 
 **Цель.** Получить живой публичный URL с минимумом кода. Отладить весь путь выкатки (systemd +
 nginx + certbot) **до** того, как появится сложная логика. Дальше каждый этап переиспользует этот
