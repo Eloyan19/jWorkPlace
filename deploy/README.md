@@ -71,6 +71,44 @@ curl -s https://jwork.jorchik.com/api/health  # {"status":"ok","version":"<sha>"
 Ручная проверка: открыть `https://jwork.jorchik.com` в браузере — страница jWorkPlace,
 замок TLS в адресной строке, индикатор «backend online» зелёный.
 
+## Этап 1 — индексация (первичная настройка на VPS)
+
+Разово, кроме кода (уже в `redeploy.sh`):
+
+### 1. gitleaks (скан секретов до индексации)
+
+```bash
+cd /tmp && curl -sL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o gitleaks.tar.gz
+tar xzf gitleaks.tar.gz gitleaks && sudo install -m 0755 gitleaks /usr/local/bin/gitleaks && gitleaks version
+```
+
+Без gitleaks сервис не падает (деградация до фильтра чувствительных имён + warning в журнале),
+но полноценный скан секретов чужого репо требует бинаря.
+
+### 2. Data-dir (`$JWP_DATA_DIR`, вне git)
+
+```bash
+sudo mkdir -p /var/lib/jworkplace && sudo chmod 700 /var/lib/jworkplace
+```
+
+Сюда сервис (от root) кладёт `jworkplace.sqlite`, `repos/<id>/` (клоны), `indexes/<id>/index.faiss`.
+
+### 3. Токен-барьер публичного URL
+
+`GATE_TOKEN` в `backend/.env` (`openssl rand -hex 32`, в git не попадает). Его использует:
+- **nginx** — гейт на `/api/*` кроме `/api/health` (плейсхолдер `__GATE_TOKEN__` в
+  `deploy/nginx-jworkplace.conf` → инжектится в живой конфиг на деплое);
+- **фронт** — как `VITE_API_TOKEN` (пробрасывает `redeploy.sh` при сборке; это барьер, не секрет).
+
+Rate-limit зоны — `deploy/nginx-jworkplace-ratelimit.conf` → `/etc/nginx/conf.d/`.
+Всё это ставит идемпотентно `deploy/redeploy.sh nginx` (и `all`). Открыть UI можно так:
+`https://jwork.jorchik.com/?token=<GATE_TOKEN>` (токен осядет в localStorage).
+
+### 4. Зависимости индексации
+
+`requirements.txt` тянет `tree_sitter`, `tree_sitter_language_pack`, `faiss-cpu`, `numpy`
+(ставит `redeploy.sh backend`). Ollama `nomic-embed-text` на `:11434` уже поднят.
+
 ## Redeploy (после обновления кода)
 
 Одной командой — скрипт `deploy/redeploy.sh` (идемпотентный, проставляет `GIT_SHA` в юнит,

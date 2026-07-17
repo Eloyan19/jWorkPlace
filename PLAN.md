@@ -35,7 +35,7 @@ git-дерева (напр. `/var/lib/jworkplace`).
 | Этап | Цель | Главный результат по `https://jwork.jorchik.com` |
 |---|---|---|
 | **0 ✅** | Walking skeleton + деплой-пайплайн | **Сделано:** страница + `/api/health`→`ok` живут по HTTPS на `jwork.jorchik.com` |
-| **1** | Индексация репо (RAG-хранилище) | Вставил ссылку на GitHub → проект индексируется, появляется в списке, переключается |
+| **1 ✅** | Индексация репо (RAG-хранилище) | **Сделано:** вставил ссылку → клон+скан+tree-sitter+FAISS → `ready`, список, переключение; токен-гейт; recall@k baseline |
 | **2** | Grounded-чат по коду | Задал вопрос по проекту → grounded-ответ с источниками `file::symbol::строки` + гейт «не знаю» |
 | **3** | Правки + Pull Request | Попросил правку → предложенный diff → подтвердил → создан реальный PR (ссылка) |
 | **4** | Рой агентов (Слой B) | Задача-изменение → рой (planner/critic/coder/reviewer/judge) → подтверждение → PR |
@@ -98,6 +98,16 @@ redeploy-инструкция в `deploy/README.md` воспроизводима
 ---
 
 ## Этап 1 — Индексация репо
+
+> ✅ **ВЫПОЛНЕНО 2026-07-18.** 1a+1b одним инкрементом. `backend/app/indexing/` (validation →
+> clone → scan+gitleaks → chunker tree-sitter → embeddings nomic+кэш → faiss_store) + `db.py`
+> (SQLite) + `api/projects.py` (фон через `pipeline` state-machine). Фронт `ProjectsPanel`
+> (подключение/список/переключение, токен из `?token=`→localStorage). Токен-гейт nginx на `/api/*`
+> (только `Authorization: Bearer`, health открыт) + rate-limit зоны. gitleaks fail-closed
+> (секреты гейтятся до эмбеддинга). Прошли эксперты (rag-indexing + security-auditor ×2) +
+> `/code-review` high (4 находки исправлены: reindex-loop, GC задачи, indexed-флаг, путь-гейт).
+> Живой прод: клон+индекс `octocat/Hello-World`→`ready`; recall@k baseline **файл 1.00 / символ 0.80**
+> (`eval/recall_at_k.py`, markupsafe). 30 pytest + 8 vitest зелёные.
 
 **Цель.** Пользователь вставляет ссылку на публичный GitHub-репо → сервис клонирует, безопасно
 сканирует, code-aware-индексирует и сохраняет per-project индекс. Проекты копятся, между ними можно

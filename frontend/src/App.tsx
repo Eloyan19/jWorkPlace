@@ -1,4 +1,5 @@
 import HealthIndicator from './components/HealthIndicator'
+import ProjectsPanel from './components/ProjectsPanel'
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       </header>
       <main>
         <HealthIndicator />
+        <ProjectsPanel />
       </main>
     </div>
   )

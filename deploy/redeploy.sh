@@ -15,8 +15,15 @@ REPO=/root/repos/jWorkPlace
 UNIT=/etc/systemd/system/jworkplace.service
 WWW=/var/www/jworkplace
 HEALTH_URL=https://jwork.jorchik.com/api/health
+NGINX_SITE=/etc/nginx/sites-available/jwork.jorchik.com
+NGINX_RATELIMIT=/etc/nginx/conf.d/jworkplace-ratelimit.conf
 
-TARGET="${1:-all}"   # all | backend | frontend
+TARGET="${1:-all}"   # all | backend | frontend | nginx
+
+# Читаем GATE_TOKEN из backend/.env (в git не попадает). Барьер публичного URL.
+gate_token() {
+  grep -E '^GATE_TOKEN=' "$REPO"/backend/.env | cut -d= -f2- || true
+}
 
 redeploy_backend() {
   echo "→ backend: GIT_SHA + зависимости + рестарт"
@@ -32,17 +39,28 @@ redeploy_backend() {
 
 redeploy_frontend() {
   echo "→ frontend: сборка + выкладка в $WWW"
-  ( cd "$REPO"/frontend && npm ci --silent && npm run build )
+  # VITE_API_TOKEN — токен-барьер /api/*; попадает в бандл (это барьер, не секрет).
+  ( cd "$REPO"/frontend && npm ci --silent && VITE_API_TOKEN="$(gate_token)" npm run build )
   mkdir -p "$WWW"
   rm -rf "${WWW:?}"/assets           # чистим старые хэш-ассеты, чтобы не копились
   cp -r "$REPO"/frontend/dist/* "$WWW"/
 }
 
+redeploy_nginx() {
+  echo "→ nginx: ratelimit-зоны + инжект токена в сайт-конфиг + reload"
+  cp "$REPO"/deploy/nginx-jworkplace-ratelimit.conf "$NGINX_RATELIMIT"
+  # Реальный токен НЕ в git: инжектим из backend/.env в живой конфиг вместо плейсхолдера.
+  sed "s/__GATE_TOKEN__/$(gate_token)/g" "$REPO"/deploy/nginx-jworkplace.conf > "$NGINX_SITE"
+  nginx -t
+  systemctl reload nginx
+}
+
 case "$TARGET" in
-  all)      redeploy_backend; redeploy_frontend ;;
+  all)      redeploy_backend; redeploy_frontend; redeploy_nginx ;;
   backend)  redeploy_backend ;;
   frontend) redeploy_frontend ;;
-  *) echo "Неизвестный аргумент: $TARGET (ожидается: all | backend | frontend)" >&2; exit 2 ;;
+  nginx)    redeploy_nginx ;;
+  *) echo "Неизвестный аргумент: $TARGET (ожидается: all | backend | frontend | nginx)" >&2; exit 2 ;;
 esac
 
 echo "→ проверка health"

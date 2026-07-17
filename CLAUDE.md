@@ -3,13 +3,17 @@
 > **🗣 Язык общения — всегда русский.** Весь прозаический текст (анализ, планы, вопросы,
 > объяснения) — на русском. Имена кода, команды, идентификаторы — латиницей.
 
-> ✅ **Стадия: Этап 0 задеплоен — walking skeleton живёт по HTTPS.** Готово: этот `CLAUDE.md`
+> ✅ **Стадия: Этап 1 задеплоен — индексация репо живёт по HTTPS.** Готово: `CLAUDE.md`
 > (правила/инварианты/агенты), **`PLAN.md`** (поэтапный deploy-first роадмап — **прочитай его перед
-> работой над реализацией**), 11 агентов Слоя A в `.claude/agents/`, приватный репо `Eloyan19/jWorkPlace`.
-> Код Этапа 0: `backend/` (FastAPI-пакет `app/`, `GET /api/health`, `LlmService`-абстракция + DeepSeek-
-> заглушка без сети), `frontend/` (Vite+React+TS health-индикатор), `deploy/` (systemd + nginx + certbot),
-> `eval/`. **Прод живой:** `https://jwork.jorchik.com/api/health`→`ok`, TLS+авто-renew, `jworkplace.service`
-> active. **Следующий шаг — Этап 1** из `PLAN.md` (индексация репо: 1a клон+скан+SQLite, 1b tree-sitter+FAISS).
+> работой над реализацией**), 11 агентов Слоя A, приватный репо `Eloyan19/jWorkPlace`.
+> Этап 0: `backend/app/` (FastAPI, `/api/health`, `LlmService`-абстракция), фронт health-индикатор, деплой.
+> **Этап 1 (индексация):** `backend/app/indexing/` (validation SSRF-safe → безопасный clone →
+> scan+gitleaks → tree-sitter chunker → nomic-эмбеддинги+кэш → per-project FAISS), `db.py` (SQLite
+> projects/files/chunks/embed_cache), `api/projects.py` (POST/GET/reindex, фон через pipeline
+> state-machine), фронт `ProjectsPanel` (подключение/список/переключение), токен-гейт nginx на `/api/*`
+> (кроме health) + rate-limit, eval recall@k (baseline: файл 1.00, символ 0.80). **Прод живой:**
+> вставил ссылку → проект индексируется → `ready`; секреты гейтятся до эмбеддинга (fail-closed на gitleaks).
+> **Следующий шаг — Этап 2** из `PLAN.md` (grounded-чат: 2a hybrid search, 2b DeepSeek-генерация).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
 
 ---

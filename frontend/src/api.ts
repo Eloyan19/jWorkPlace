@@ -1,4 +1,4 @@
-import type { Health } from './types'
+import type { Health, Project } from './types'
 
 // Инвариант: только относительный путь. В dev его проксирует Vite (vite.config.ts ->
 // server.proxy['/api']), в проде — nginx (server_name jwork.jorchik.com, /api/* -> :8200).
@@ -9,4 +9,80 @@ export async function getHealth(): Promise<Health> {
     throw new Error(`Backend error ${res.status}`)
   }
   return (await res.json()) as Health
+}
+
+const TOKEN_STORAGE_KEY = 'jwp_token'
+
+// Токен-барьер (не секрет — реальные секреты живут только на backend): по умолчанию
+// из VITE_API_TOKEN (сборочное значение), но ссылкой вида ?token=... можно передать
+// свой и он осядет в localStorage, чтобы пережить перезагрузку страницы.
+function resolveToken(): string | undefined {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    const fromUrl = new URLSearchParams(window.location.search).get('token')
+    if (fromUrl) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, fromUrl)
+    }
+    const stored = window.localStorage.getItem(TOKEN_STORAGE_KEY)
+    if (stored) return stored
+  }
+  return import.meta.env.VITE_API_TOKEN || undefined
+}
+
+export function authHeaders(): Record<string, string> {
+  const token = resolveToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function readErrorMessage(res: Response): Promise<string> {
+  if (res.status === 401) {
+    return 'нет доступа: укажите ?token=<токен> в ссылке'
+  }
+  try {
+    const data = await res.json()
+    if (data && typeof data.detail === 'string') {
+      return data.detail
+    }
+  } catch {
+    // тело не JSON — падаем на общий текст ниже
+  }
+  return `Backend error ${res.status}`
+}
+
+export async function createProject(url: string): Promise<{ project_id: string; status: string }> {
+  const res = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ url }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { project_id: string; status: string }
+}
+
+export async function listProjects(): Promise<Project[]> {
+  const res = await fetch('/api/projects', { headers: authHeaders() })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as Project[]
+}
+
+export async function getProject(id: string): Promise<Project> {
+  const res = await fetch(`/api/projects/${id}`, { headers: authHeaders() })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as Project
+}
+
+export async function reindexProject(id: string): Promise<{ status: string }> {
+  const res = await fetch(`/api/projects/${id}/reindex`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { status: string }
 }

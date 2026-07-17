@@ -3,3 +3,13 @@ uvicorn[standard]
 httpx
 pydantic-settings
 pytest
+
+# --- Этап 1: индексация ---
+# tree-sitter + грамматики: версии пиннуем — рассинхрон ABI грамматик частый провал.
+# ВНИМАНИЕ: в этой связке cpp-грамматика (ABI 15) несовместима с tree_sitter 0.23 (ABI ≤14) —
+# cpp намеренно не в карте грамматик chunker.py, уходит в line-based fallback. Прочие 10 языков ок.
+tree_sitter==0.23.2
+tree_sitter_language_pack==1.12.5
+# Эмбеддинги/индекс
+faiss-cpu==1.14.3
+numpy==2.5.1

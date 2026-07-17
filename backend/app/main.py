@@ -1,13 +1,30 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import db
 from app.api.health import router as health_router
+from app.api.projects import router as projects_router
 from app.config import get_settings
+
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    # Проекты, застрявшие в in-progress после рестарта, → error (индексация не выжила рестарт).
+    recovered = db.recover_stuck()
+    if recovered:
+        logging.getLogger("jworkplace").info("восстановлено застрявших проектов: %d", recovered)
+    yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="jWorkPlace backend")
+    app = FastAPI(title="jWorkPlace backend", lifespan=lifespan)
 
     # CORS-middleware подключаем только если явно заданы origin'ы.
     # Никогда allow_origins=["*"] — браузер ходит только в свой backend,
@@ -22,6 +39,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
+    app.include_router(projects_router)
     return app
 
 
