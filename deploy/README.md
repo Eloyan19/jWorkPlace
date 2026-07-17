@@ -73,30 +73,27 @@ curl -s https://jwork.jorchik.com/api/health  # {"status":"ok","version":"<sha>"
 
 ## Redeploy (после обновления кода)
 
+Одной командой — скрипт `deploy/redeploy.sh` (идемпотентный, проставляет `GIT_SHA` в юнит,
+чтобы этот шаг не терялся вручную):
+
 ```bash
 cd /root/repos/jWorkPlace
-git pull   # или локальные изменения уже в рабочем дереве
-
-# backend, если менялись зависимости
-cd backend && .venv/bin/pip install -r requirements.txt && cd ..
-
-# проставить GIT_SHA в юнит (см. ниже) перед рестартом, если хотим видеть его в /api/health
-
-sudo systemctl restart jworkplace.service
-systemctl status jworkplace.service
-
-# фронт, если менялся
-cd frontend && npm ci && npm run build && cd ..
-sudo cp -r frontend/dist/* /var/www/jworkplace/
-
-curl -s https://jwork.jorchik.com/api/health
+git pull                        # или локальные изменения уже в рабочем дереве
+deploy/redeploy.sh              # backend + frontend, затем проверка health
+# deploy/redeploy.sh backend    # только backend (deps + GIT_SHA + рестарт)
+# deploy/redeploy.sh frontend   # только пересборка и выкладка фронта
 ```
 
-## Как проставить GIT_SHA в юнит
+Скрипт делает: `GIT_SHA=$(git rev-parse --short HEAD)` → в юнит; `pip install` backend-зависимостей;
+`daemon-reload` + `restart jworkplace.service`; `npm ci && npm run build` + выкладка в `/var/www/jworkplace`
+(со чисткой старых хэш-ассетов); финальный `curl` к `https://jwork.jorchik.com/api/health`.
+
+## Как проставить GIT_SHA в юнит (что делает скрипт под капотом)
 
 `GET /api/health` берёт версию из env `GIT_SHA`; если пусто — падает на
-`git rev-parse --short HEAD`, а если и это недоступно — на `"dev"`. На деплое можно
-зафиксировать точный sha релиза явно:
+`git rev-parse --short HEAD`, а если и это недоступно — на `"dev"`. В git-версии юнита поле
+`Environment=GIT_SHA=` пустое (нельзя закоммитить sha в самого себя) — точный sha релиза
+проставляется в `/etc/systemd/system/jworkplace.service` на деплое. Скрипт делает это так:
 
 ```bash
 SHA=$(cd /root/repos/jWorkPlace && git rev-parse --short HEAD)
