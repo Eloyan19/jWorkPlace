@@ -3,7 +3,7 @@
 > **🗣 Язык общения — всегда русский.** Весь прозаический текст (анализ, планы, вопросы,
 > объяснения) — на русском. Имена кода, команды, идентификаторы — латиницей.
 
-> ✅ **Стадия: Этап 2a задеплоен — hybrid search по коду живёт по HTTPS.** Готово: `CLAUDE.md`
+> ✅ **Стадия: Этап 2b задеплоен — grounded-чат по коду живёт по HTTPS.** Готово: `CLAUDE.md`
 > (правила/инварианты/агенты), **`PLAN.md`** (поэтапный deploy-first роадмап — **прочитай его перед
 > работой над реализацией**), 11 агентов Слоя A, приватный репо `Eloyan19/jWorkPlace`.
 > Этап 0: `backend/app/` (FastAPI, `/api/health`, `LlmService`-абстракция), фронт health-индикатор, деплой.
@@ -17,10 +17,21 @@
 > гейт abstain по сырым скорам: dense<0.62 И нет уверенного bm25≤−4, dense-only fallback),
 > `faiss_store` LRU-кэш, `api/search.py` (`POST /api/search`), фронт `SearchPanel` + `activeProject.ts`,
 > nginx `= /api/search`. Baseline: файл 1.00 / символ 0.80 / MRR 0.900; abstain позитивы 5/5, negatives 4/4.
-> **Прод живой:** вставил ссылку → `ready`; спросил по коду → фрагменты с `file::symbol::строки`;
-> off-topic → «не знаю». Секреты гейтятся до эмбеддинга (fail-closed на gitleaks).
-> **Следующий шаг — Этап 2b** из `PLAN.md` (grounded-генерация: DeepSeek за абстракцией, JSON
-> `{answer, used}`, line-based валидация цитат, гейт «не знаю» без генерации, защита от prompt injection).
+> **Этап 2b (grounded-генерация):** `llm/deepseek.py` (реальный httpx `deepseek-chat`, ключ только в
+> Authorization, retry на finish_reason=length, `LlmError` без repr/URL), `llm/base.py` (`chat` +
+> response_format/temperature), `chat/grounding.py` (`build_context` нонс-делимитеры + `SYSTEM_PROMPT`
+> anti-injection, `parse_and_validate` line-based цитаты по ФАЙЛУ на диске + traversal/project_id-guard,
+> `redact` второй барьер секретов), `api/chat.py` (`POST /api/chat`: retrieve → гейт should_abstain БЕЗ
+> LLM → генерация → валидация → downgrade в abstain при пустых/невалидных цитатах; коерция роли,
+> takeLast), `api/search.py` тоже через `redact`, фронт `ChatPanel` (пузыри + источники + abstain),
+> nginx `= /api/chat` (Bearer, timeout 180s). Прошли llm-engineer + security-auditor (аудит чист) +
+> `/code-review`. **Baseline grounded-точности:** cases 5/5 = 1.00 валидных line-based цитат, negatives
+> 4/4 abstain. 88 pytest + 18 vitest.
+> **Прод живой:** вставил ссылку → `ready`; спросил по коду → grounded-ответ с источниками
+> `file::symbol::строки` + дословный quote; off-topic → «не знаю» без генерации. Секреты гейтятся до
+> эмбеддинга (fail-closed на gitleaks) и маскируются `redact` до LLM/клиента.
+> **Следующий шаг — Этап 3** из `PLAN.md` (правки + Pull Request: fine-grained PAT, предпросмотр diff,
+> `git apply --check`, human-in-the-loop подтверждение, PR через `gh`).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
 
 ---

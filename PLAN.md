@@ -36,7 +36,7 @@ git-дерева (напр. `/var/lib/jworkplace`).
 |---|---|---|
 | **0 ✅** | Walking skeleton + деплой-пайплайн | **Сделано:** страница + `/api/health`→`ok` живут по HTTPS на `jwork.jorchik.com` |
 | **1 ✅** | Индексация репо (RAG-хранилище) | **Сделано:** вставил ссылку → клон+скан+tree-sitter+FAISS → `ready`, список, переключение; токен-гейт; recall@k baseline |
-| **2** | Grounded-чат по коду | **2a ✅** hybrid search: спросил → фрагменты кода `file::symbol::строки` + abstain. **2b** — DeepSeek grounded-генерация |
+| **2 ✅** | Grounded-чат по коду | **Сделано:** спросил → grounded-ответ DeepSeek с источниками `file::symbol::строки` + дословный quote (line-based валидация); off-topic → «не знаю» без генерации |
 | **3** | Правки + Pull Request | Попросил правку → предложенный diff → подтвердил → создан реальный PR (ссылка) |
 | **4** | Рой агентов (Слой B) | Задача-изменение → рой (planner/critic/coder/reviewer/judge) → подтверждение → PR |
 
@@ -189,9 +189,17 @@ baseline; RAM в пределах бюджета.
   `/code-review` (2 фронт-фикса). **Прод живой:** спросил → фрагменты; off-topic → «не знаю».
   Оговорка: символ 0.80 — артефакт чанкинга (`striptags` = метод под классом `Markup`), не промах
   retrieval; метод-уровневый чанкинг — кандидат в доработку Этапа 1.
-- **2b — grounded-генерация:** DeepSeek за абстракцией, JSON `{answer, used}`, line-based валидация
-  цитат, гейт «не знаю» без генерации, защита от prompt injection, источники в UI. Деплой: полноценный
-  grounded-чат по коду.
+- **2b ✅ ВЫПОЛНЕНО 2026-07-18 (коммит `945c7f2`)** — grounded-генерация: DeepSeek за абстракцией
+  (`llm/deepseek.py`, реальный httpx `deepseek-chat`, ключ только в Authorization), JSON `{answer, used}`,
+  **line-based валидация цитат** по файлу на диске (`chat/grounding.py` `parse_and_validate`; код —
+  дословно, проза — с нормализацией; traversal/project_id-guard), гейт «не знаю» БЕЗ генерации +
+  downgrade при пустых/невалидных цитатах (`api/chat.py`), защита от prompt injection (нонс-делимитеры +
+  `SYSTEM_PROMPT` + коерция роли клиента), второй барьер секретов `redact` (до LLM и клиента), фронт
+  `ChatPanel` с источниками. nginx `= /api/chat` (Bearer, timeout 180s). Прошли llm-engineer +
+  security-auditor (аудит чист, must-fix нет) + `/code-review` (3 находки исправлены). **Baseline
+  grounded-точности:** cases 5/5 = 1.00 валидных line-based цитат, negatives 4/4 abstain
+  (`eval/grounded_accuracy.py`). 88 pytest + 18 vitest. **Прод живой:** спросил про `should_abstain` →
+  ответ + цитата `hybrid.py::should_abstain::L99-112`; off-topic → «не знаю».
 
 **Задачи.**
 - `rag-indexing-engineer` (эксперт ПЕРВЫМ) — **hybrid search**: лексический (BM25/grep по
