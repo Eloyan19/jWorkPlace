@@ -241,3 +241,130 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/* --- Поиск по коду (Этап 2a) --- */
+.search-panel {
+  margin-top: 2.5rem;
+  text-align: left;
+}
+
+.search-panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+
+.search-hint {
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  font-size: 0.95rem;
+  background: #fff;
+  color: inherit;
+}
+
+.search-form button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: #2f6fed;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.search-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-form input {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+.search-error {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.search-abstain {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  background: rgba(241, 196, 15, 0.14);
+  font-size: 0.9rem;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.result-card {
+  border-radius: 0.6rem;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  .result-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.result-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.result-citation {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.result-scores {
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.result-snippet {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.06);
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  .result-snippet {
+    background: rgba(0, 0, 0, 0.25);
+  }
+}

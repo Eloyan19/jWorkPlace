@@ -1,11 +1,17 @@
 {
   "repo": "https://github.com/pallets/markupsafe",
-  "description": "Golden-набор Этапа 1: вопрос → ожидаемый файл (и опц. символ). Небольшой стабильный репо.",
+  "description": "Golden-набор Этапов 1–2: вопрос → ожидаемый файл (и опц. символ). Небольшой стабильный репо. negatives — вопросы не по репо (проверка гейта abstain, Этап 2a).",
   "cases": [
     {"question": "function that escapes HTML special characters", "file": "src/markupsafe/__init__.py", "symbol": "escape"},
     {"question": "Markup class that marks a string as safe HTML", "file": "src/markupsafe/__init__.py", "symbol": "Markup"},
     {"question": "how are string format arguments escaped", "file": "src/markupsafe/__init__.py", "symbol": "EscapeFormatter"},
     {"question": "native python implementation of escape inner", "file": "src/markupsafe/_native.py", "symbol": "_escape_inner"},
     {"question": "strip HTML tags from a string", "file": "src/markupsafe/__init__.py", "symbol": "striptags"}
+  ],
+  "negatives": [
+    "how to configure kubernetes ingress controller",
+    "react useState hook for form state",
+    "postgres connection pool configuration",
+    "train a convolutional neural network on images"
   ]
 }

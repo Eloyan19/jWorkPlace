@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { createProject, listProjects, reindexProject } from '../api'
+import { clearActiveProject, readActiveProject, writeActiveProject } from '../activeProject'
 import type { Project, ProjectStatus } from '../types'
 
 const POLL_INTERVAL_MS = 2_000
-const ACTIVE_PROJECT_KEY = 'jwp_active_project'
 
 const IN_PROGRESS_STATUSES: ProjectStatus[] = ['cloning', 'scanning', 'indexing']
 
@@ -21,22 +21,6 @@ function isInProgress(status: ProjectStatus): boolean {
 
 function isValidRepoUrl(url: string): boolean {
   return url.trim().startsWith('https://github.com/')
-}
-
-function hasLocalStorage(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
-}
-
-function readActiveProject(): string | null {
-  return hasLocalStorage() ? window.localStorage.getItem(ACTIVE_PROJECT_KEY) : null
-}
-
-function writeActiveProject(id: string): void {
-  if (hasLocalStorage()) window.localStorage.setItem(ACTIVE_PROJECT_KEY, id)
-}
-
-function clearActiveProject(): void {
-  if (hasLocalStorage()) window.localStorage.removeItem(ACTIVE_PROJECT_KEY)
 }
 
 function ProjectsPanel() {
@@ -70,13 +54,14 @@ function ProjectsPanel() {
       if (!mountedRef.current) return
       setProjects(result)
       setListError(null)
-      setActiveId((current) => {
-        if (current && !result.some((p) => p.id === current)) {
-          clearActiveProject()
-          return null
-        }
-        return current
-      })
+      // Активный проект исчез из списка → снимаем выбор. Побочный эффект (clearActiveProject
+      // шлёт событие → setState в SearchPanel) держим ВНЕ updater'а setState: updater обязан быть
+      // чистым (в StrictMode зовётся дважды), а обновлять другой компонент из него — анти-паттерн.
+      const current = activeIdRef.current
+      if (current && !result.some((p) => p.id === current)) {
+        clearActiveProject()
+        setActiveId(null)
+      }
     } catch (err) {
       if (!mountedRef.current) return
       setListError(err instanceof Error ? err.message : 'не удалось получить список проектов')
@@ -93,6 +78,9 @@ function ProjectsPanel() {
   const hasInProgress = projects.some((p) => isInProgress(p.status))
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
+  // Свежий activeId для refresh (useCallback с [] иначе замкнул бы устаревшее значение).
+  const activeIdRef = useRef(activeId)
+  activeIdRef.current = activeId
 
   useEffect(() => {
     if (!hasInProgress) return

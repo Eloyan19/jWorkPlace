@@ -1,4 +1,4 @@
-import type { Health, Project } from './types'
+import type { Health, Project, SearchResponse } from './types'
 
 // Инвариант: только относительный путь. В dev его проксирует Vite (vite.config.ts ->
 // server.proxy['/api']), в проде — nginx (server_name jwork.jorchik.com, /api/* -> :8200).
@@ -85,4 +85,20 @@ export async function reindexProject(id: string): Promise<{ status: string }> {
     throw new Error(await readErrorMessage(res))
   }
   return (await res.json()) as { status: string }
+}
+
+export async function searchCode(
+  projectId: string,
+  query: string,
+  k = 8,
+): Promise<SearchResponse> {
+  const res = await fetch('/api/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ project_id: projectId, query, k }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as SearchResponse
 }

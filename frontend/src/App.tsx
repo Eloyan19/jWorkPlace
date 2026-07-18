@@ -1,5 +1,6 @@
 import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
+import SearchPanel from './components/SearchPanel'
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <main>
         <HealthIndicator />
         <ProjectsPanel />
+        <SearchPanel />
       </main>
     </div>
   )

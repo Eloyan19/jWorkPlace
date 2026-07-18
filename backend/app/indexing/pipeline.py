@@ -14,7 +14,7 @@ import numpy as np
 
 from app import db
 from app.config import get_settings
-from app.indexing import clone, embeddings, faiss_store, scan
+from app.indexing import clone, embeddings, faiss_store, lexical, scan
 from app.indexing.chunker import chunk_file
 
 logger = logging.getLogger("jworkplace.pipeline")
@@ -112,6 +112,7 @@ def _index(project_id: str, repo_dir, secret_ranges: dict) -> None:
     db.delete_chunks(project_id)
     if not rows:
         faiss_store.build_index(project_id, np.zeros((0, embeddings.EMBED_DIM), dtype="float32"))
+        _rebuild_fts(project_id, [], [])
         return
 
     # Часть чанков может не влезть в контекст эмбеддера — kept оставляет только успешные,
@@ -120,9 +121,30 @@ def _index(project_id: str, repo_dir, secret_ranges: dict) -> None:
     rows = [rows[i] for i in kept]
     if not rows:
         faiss_store.build_index(project_id, np.zeros((0, embeddings.EMBED_DIM), dtype="float32"))
+        _rebuild_fts(project_id, [], [])
         return
     chunk_ids = db.insert_chunks(rows)           # порядок сохранён = порядок vectors
     faiss_store.build_index(project_id, vectors) # faiss_id = порядок = i
     db.set_faiss_ids([(i, chunk_ids[i]) for i in range(len(chunk_ids))])
+    # Лексический индекс (FTS5) — из тех же rows/chunk_ids, симметрично FAISS (полный ребилд).
+    _rebuild_fts(project_id, rows, chunk_ids)
     # indexed=1 только у файлов, чьи чанки реально попали в индекс (после фильтра kept).
     db.mark_files_indexed(project_id, sorted({r["file"] for r in rows}))
+
+
+def _rebuild_fts(project_id: str, rows: list[dict], chunk_ids: list[int]) -> None:
+    """Пересобрать per-project FTS5 из чанков (drop→create→insert). Токенизируем тут (не в db)."""
+    db.drop_fts(project_id)
+    db.create_fts(project_id)
+    if not rows:
+        return
+    fts_rows = [
+        (
+            chunk_ids[i],
+            lexical.code_tokenize(r["text"]),
+            lexical.code_tokenize(r["symbol"] or ""),
+            lexical.code_tokenize(r["file"]),
+        )
+        for i, r in enumerate(rows)
+    ]
+    db.fts_insert(project_id, fts_rows)

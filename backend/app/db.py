@@ -7,12 +7,17 @@
 Секреты чужого репо сюда не попадают: файлы с находками gitleaks/чувствительными именами
 помечаются files.excluded=1 и не чанкуются (см. indexing/scan.py, chunker.py).
 """
+import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional
 
 from app.config import get_settings
+
+# project_id — это uuid4().hex[:12] (только [0-9a-f]). Имя per-project FTS-таблицы нельзя
+# параметризовать плейсхолдером, поэтому строго валидируем перед подстановкой в SQL.
+_SAFE_PROJECT_ID = re.compile(r"^[0-9a-f]{1,32}$")
 
 # Статусы проекта — единый источник для backend и (через API) фронта.
 STATUS_CLONING = "cloning"
@@ -238,3 +243,88 @@ def cache_put(blob_sha: str, chunk_hash: str, vector: bytes) -> None:
             "INSERT OR IGNORE INTO embed_cache (blob_sha, chunk_hash, vector) VALUES (?, ?, ?)",
             (blob_sha, chunk_hash, vector),
         )
+
+
+# --- FTS5 лексический канал (Этап 2a) ---
+# Per-project таблица fts_<project_id> (изоляция как у FAISS: чистый DROP при reindex, без утечки
+# релевантности между проектами). rowid = chunks.chunk_id. Веса bm25 задаёт слой поиска (hybrid.py).
+# Токенизацию (code_tokenize) делает вызывающий — сюда приходят уже готовые строки.
+
+def _fts_table(project_id: str) -> str:
+    if not _SAFE_PROJECT_ID.match(project_id):
+        raise ValueError(f"недопустимый project_id для имени FTS-таблицы: {project_id!r}")
+    return f"fts_{project_id}"
+
+
+def create_fts(project_id: str) -> None:
+    """Создать пустую FTS5-таблицу проекта. Идемпотентно (IF NOT EXISTS)."""
+    table = _fts_table(project_id)
+    with get_conn() as conn:
+        conn.execute(
+            f"CREATE VIRTUAL TABLE IF NOT EXISTS {table} "
+            f"USING fts5(body, symbol, path, tokenize='unicode61 remove_diacritics 2')"
+        )
+
+
+def drop_fts(project_id: str) -> None:
+    table = _fts_table(project_id)
+    with get_conn() as conn:
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+def fts_exists(project_id: str) -> bool:
+    """Есть ли у проекта FTS-таблица (проекты, проиндексированные до Этапа 2a, её не имеют)."""
+    table = _fts_table(project_id)
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+        ).fetchone()
+        return row is not None
+
+
+def fts_insert(project_id: str, rows: list[tuple[int, str, str, str]]) -> None:
+    """Вставить строки (chunk_id, body, symbol, path) — уже токенизированные code_tokenize."""
+    table = _fts_table(project_id)
+    with get_conn() as conn:
+        conn.executemany(
+            f"INSERT INTO {table} (rowid, body, symbol, path) VALUES (?, ?, ?, ?)", rows
+        )
+
+
+def fts_search(project_id: str, match_query: str, limit: int) -> list[tuple[int, float]]:
+    """top-limit лексических кандидатов как (chunk_id, bm25_score). bm25 отрицателен, меньше = лучше;
+    веса колонок body/symbol/path = 1/5/2 (символ важнее тела для точного идентификатора)."""
+    table = _fts_table(project_id)
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT rowid, bm25({table}, 1.0, 5.0, 2.0) AS score "
+            f"FROM {table} WHERE {table} MATCH ? ORDER BY score LIMIT ?",
+            (match_query, limit),
+        ).fetchall()
+        return [(int(r["rowid"]), float(r["score"])) for r in rows]
+
+
+def chunks_by_ids(project_id: str, chunk_ids: list[int]) -> dict[int, sqlite3.Row]:
+    """Добор полей чанков по chunk_id (после слияния каналов). Пустой список → пустой dict."""
+    if not chunk_ids:
+        return {}
+    placeholders = ",".join("?" * len(chunk_ids))
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM chunks WHERE project_id = ? AND chunk_id IN ({placeholders})",
+            (project_id, *chunk_ids),
+        ).fetchall()
+        return {r["chunk_id"]: r for r in rows}
+
+
+def chunks_by_faiss_ids(project_id: str, faiss_ids: list[int]) -> dict[int, sqlite3.Row]:
+    """Добор чанков по faiss_id (dense-канал возвращает faiss_id). Пустой список → пустой dict."""
+    if not faiss_ids:
+        return {}
+    placeholders = ",".join("?" * len(faiss_ids))
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM chunks WHERE project_id = ? AND faiss_id IN ({placeholders})",
+            (project_id, *faiss_ids),
+        ).fetchall()
+        return {r["faiss_id"]: r for r in rows}
