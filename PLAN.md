@@ -36,7 +36,7 @@ git-дерева (напр. `/var/lib/jworkplace`).
 |---|---|---|
 | **0 ✅** | Walking skeleton + деплой-пайплайн | **Сделано:** страница + `/api/health`→`ok` живут по HTTPS на `jwork.jorchik.com` |
 | **1 ✅** | Индексация репо (RAG-хранилище) | **Сделано:** вставил ссылку → клон+скан+tree-sitter+FAISS → `ready`, список, переключение; токен-гейт; recall@k baseline |
-| **2** | Grounded-чат по коду | Задал вопрос по проекту → grounded-ответ с источниками `file::symbol::строки` + гейт «не знаю» |
+| **2** | Grounded-чат по коду | **2a ✅** hybrid search: спросил → фрагменты кода `file::symbol::строки` + abstain. **2b** — DeepSeek grounded-генерация |
 | **3** | Правки + Pull Request | Попросил правку → предложенный diff → подтвердил → создан реальный PR (ссылка) |
 | **4** | Рой агентов (Слой B) | Задача-изменение → рой (planner/critic/coder/reviewer/judge) → подтверждение → PR |
 
@@ -180,9 +180,15 @@ baseline; RAM в пределах бюджета.
 кода**, с источниками и жёстким гейтом «не знаю». Никакого отката на общие знания модели.
 
 **Под-релизы (деплоим по отдельности):**
-- **2a — retrieval без LLM:** hybrid search (BM25+dense/RRF) + эндпоинт `POST /api/search` + UI, что
-  показывает найденные фрагменты кода с `file::symbol::строки`. Деплой: спросил → видишь релевантные
-  куски кода (ключ DeepSeek ещё не нужен — проверяем качество поиска отдельно от генерации).
+- **2a ✅ ВЫПОЛНЕНО 2026-07-18 (коммит `60b4415`)** — retrieval без LLM: hybrid search (BM25 через
+  FTS5 + dense/RRF k=60) + `POST /api/search` + UI `SearchPanel` (фрагменты с `file::symbol::строки`,
+  сырые скоры, abstain). `indexing/lexical.py` (code_tokenize), per-project `fts_<pid>` (bm25 1/5/2),
+  `indexing/hybrid.py` (гейт: dense<0.62 И нет уверенного bm25≤−4, dense-only fallback), `faiss_store`
+  LRU-кэш, nginx `= /api/search` (общий лимит, без строгого индексационного). **Baseline:** файл 1.00 /
+  символ 0.80 / MRR 0.900; abstain позитивы 5/5, negatives 4/4. Прошли rag-indexing-engineer +
+  `/code-review` (2 фронт-фикса). **Прод живой:** спросил → фрагменты; off-topic → «не знаю».
+  Оговорка: символ 0.80 — артефакт чанкинга (`striptags` = метод под классом `Markup`), не промах
+  retrieval; метод-уровневый чанкинг — кандидат в доработку Этапа 1.
 - **2b — grounded-генерация:** DeepSeek за абстракцией, JSON `{answer, used}`, line-based валидация
   цитат, гейт «не знаю» без генерации, защита от prompt injection, источники в UI. Деплой: полноценный
   grounded-чат по коду.
