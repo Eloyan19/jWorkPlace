@@ -38,3 +38,26 @@ export interface SearchResponse {
   abstain_reason: string | null
   hits: SearchHit[]
 }
+
+// Grounded-чат по коду (Этап 2b). История держится на фронте one-shot (retrieve по последнему
+// вопросу) — backend не хранит диалог между запросами.
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+// Источник ответа: цитата дословно по диапазону строк файла (валидировано backend'ом).
+export interface ChatSource {
+  id: number
+  file: string
+  symbol: string | null
+  lines: string
+  citation: string
+  quote: string
+}
+
+export interface ChatResponse {
+  answer: string
+  abstain: boolean
+  sources: ChatSource[]
+}

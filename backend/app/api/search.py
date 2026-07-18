@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app import db
+from app.chat.grounding import redact
 from app.indexing import hybrid
 
 router = APIRouter(prefix="/api/search")
@@ -34,7 +35,7 @@ def _hit_dto(hit: dict) -> dict:
         "dense_score": hit["dense_score"],
         "bm25_score": hit["bm25_score"],
         "rrf_score": hit["rrf_score"],
-        "text": hit["text"],
+        "text": redact(hit["text"]),
     }
 
 
