@@ -75,22 +75,33 @@ def _rev_parse(repo_dir: Path) -> str:
 
 
 def pull_repo(project_id: str) -> str:
-    """git pull для инкрементального reindex. Возвращает новый head_sha."""
+    """Синхронизация клона с origin для инкрементального reindex. Возвращает новый head_sha.
+
+    Клон read-only и лишь ЗЕРКАЛИТ origin — поэтому не merge/rebase (`git pull` на divergent
+    истории требует стратегии и падает «Need to specify how to reconcile divergent branches»,
+    а после force-push/переписанной истории ветки как раз расходятся), а `fetch` + жёсткий
+    `reset --hard` к свежему origin. Устойчиво к продвинутой/переписанной истории и shallow-границам.
+    """
     settings = get_settings()
     dest = settings.repos_dir / project_id
     if not dest.exists():
         raise CloneError("Клон отсутствует — нужен полный reclone.")
+    env = {**_GIT_ENV, "PATH": "/usr/bin:/bin:/usr/local/bin"}
     try:
         subprocess.run(
-            ["git", "-C", str(dest), *_flatten_config(), "pull", "--depth", "1", "--no-tags"],
-            env={**_GIT_ENV, "PATH": "/usr/bin:/bin:/usr/local/bin"},
-            capture_output=True, text=True, timeout=settings.clone_timeout_s, check=True,
+            ["git", "-C", str(dest), *_flatten_config(), "fetch", "--depth", "1", "--no-tags", "origin"],
+            env=env, capture_output=True, text=True, timeout=settings.clone_timeout_s, check=True,
+        )
+        # FETCH_HEAD = верхушка отслеживаемой ветки (клон --single-branch, refspec один).
+        subprocess.run(
+            ["git", "-C", str(dest), *_flatten_config(), "reset", "--hard", "FETCH_HEAD"],
+            env=env, capture_output=True, text=True, timeout=settings.clone_timeout_s, check=True,
         )
         return _rev_parse(dest)
     except subprocess.TimeoutExpired:
-        raise CloneError(f"Таймаут git pull ({settings.clone_timeout_s} с).")
+        raise CloneError(f"Таймаут git fetch ({settings.clone_timeout_s} с).")
     except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or "").strip().splitlines()[-1:] or ["git pull failed"]
+        detail = (exc.stderr or "").strip().splitlines()[-1:] or ["git fetch failed"]
         raise CloneError(f"Не удалось обновить: {detail[0]}")
 
 
