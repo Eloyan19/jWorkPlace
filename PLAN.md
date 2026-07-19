@@ -262,11 +262,18 @@ line-based валидацией; гейт «не знаю»; UI чата с ис
   `eval/pr_quality.py`. Прошли security-auditor + llm-engineer + `/code-review` (5 находок, значимые
   исправлены). 102 pytest + 24 vitest. **Прод живой:** правка → diff с источником, `git apply --check`
   прошёл; off-topic → «не могу»; ключ не в логах.
-- **3b — реальный PR:** fine-grained PAT в env, writable-клон в `$JWP_DATA_DIR/worktrees/<pid>/` (токен
-  только через env-`http.extraHeader`, не в URL/argv), ветка `jworkplace/<feature>`, `commit --no-verify`
-  → push → PR через `gh`; `POST /api/projects/{id}/pr {confirm}` (human-in-the-loop). Требует действия
-  пользователя: PAT (`contents:write`+`pull_requests:write`) на его тестовый репо. Повторный аудит
-  security-auditor. Кнопка «Подтвердить и открыть PR» активируется.
+- **3b — реальный PR (per-project PAT через UI):** возможность правок — **свойство проекта**, а не
+  всего сервиса. Токена нет → проект read-only (клон+индекс+чат+предпросмотр diff). Пользователь вводит
+  fine-grained PAT **в UI для конкретного проекта** (`PUT /api/projects/{id}/token`, валидация: токен
+  рабочий + покрывает именно репо проекта + даёт push) → проект получает уровень «правки включены».
+  Токен **шифруется at rest** (`JWP_SECRET_KEY` env, Fernet) в `projects.github_token_enc`, write-only
+  (не возвращается/не логируется/не в промпт; `GET` отдаёт лишь `can_edit`). Writable-клон в
+  `$JWP_DATA_DIR/worktrees/<pid>/`, токен git-у только через env-`http.extraHeader` (не в URL/argv),
+  ветка `jworkplace/<feature>`, `commit --no-verify` → push → PR через `gh`; `POST
+  /api/projects/{id}/pr {confirm}` — только при confirm И наличии токена (human-in-the-loop). Механизм
+  патча из 3a переиспользуется как есть. `security-auditor` ПЕРВЫМ (хранение/шифрование/привязка токена
+  к репо). Обновляет инвариант `CLAUDE.md` «токен только в env» → «per-project, шифрован в data-dir,
+  ключ в env». Кнопка «Подтвердить и открыть PR» активна при `can_edit`.
 
 **Задачи.**
 - `security-auditor` (эксперт ПЕРВЫМ) — GitHub-доступ: **fine-grained PAT** с минимальным scope
