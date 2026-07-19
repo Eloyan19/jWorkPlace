@@ -262,18 +262,21 @@ line-based валидацией; гейт «не знаю»; UI чата с ис
   `eval/pr_quality.py`. Прошли security-auditor + llm-engineer + `/code-review` (5 находок, значимые
   исправлены). 102 pytest + 24 vitest. **Прод живой:** правка → diff с источником, `git apply --check`
   прошёл; off-topic → «не могу»; ключ не в логах.
-- **3b — реальный PR (per-project PAT через UI):** возможность правок — **свойство проекта**, а не
-  всего сервиса. Токена нет → проект read-only (клон+индекс+чат+предпросмотр diff). Пользователь вводит
-  fine-grained PAT **в UI для конкретного проекта** (`PUT /api/projects/{id}/token`, валидация: токен
-  рабочий + покрывает именно репо проекта + даёт push) → проект получает уровень «правки включены».
-  Токен **шифруется at rest** (`JWP_SECRET_KEY` env, Fernet) в `projects.github_token_enc`, write-only
-  (не возвращается/не логируется/не в промпт; `GET` отдаёт лишь `can_edit`). Writable-клон в
-  `$JWP_DATA_DIR/worktrees/<pid>/`, токен git-у только через env-`http.extraHeader` (не в URL/argv),
-  ветка `jworkplace/<feature>`, `commit --no-verify` → push → PR через `gh`; `POST
-  /api/projects/{id}/pr {confirm}` — только при confirm И наличии токена (human-in-the-loop). Механизм
-  патча из 3a переиспользуется как есть. `security-auditor` ПЕРВЫМ (хранение/шифрование/привязка токена
-  к репо). Обновляет инвариант `CLAUDE.md` «токен только в env» → «per-project, шифрован в data-dir,
-  ключ в env». Кнопка «Подтвердить и открыть PR» активна при `can_edit`.
+- **3b ✅ ВЫПОЛНЕНО 2026-07-19 (коммит `594705a`, авто-проверки; ручная — реальный PR — за
+  пользователем)** — реальный PR через per-project PAT из UI. Возможность правок — **свойство
+  проекта**: токена нет → read-only; пользователь вводит fine-grained PAT в UI (`PUT
+  /api/projects/{id}/token`, валидация против репо ИМЕННО проекта — push+full_name) → «правки включены».
+  Токен шифруется at rest (`JWP_SECRET_KEY`, Fernet) в `projects.github_token_enc`, write-only
+  (`GET`/`_project_dto` отдают лишь `can_edit`). `edit/github.py`: writable-клон в
+  `$JWP_DATA_DIR/worktrees/<pid>/` (БЕЗ blob:none), токен git-у ТОЛЬКО через env `GIT_CONFIG_*`
+  http.extraHeader (не URL/argv/reflog), ветка `jworkplace/<slug>`, bot-commit → push явным refspec →
+  `gh pr create` (`GH_TOKEN` env); stderr+PR-body через `redact`. `POST /api/projects/{id}/pr {confirm,
+  instruction, expected_diff}` — human-in-the-loop: сервер НЕ доверяет клиентскому diff, а
+  **регенерирует и сверяет** (409 на расхождение), guard от гонки, fail-closed. Механизм патча 3a
+  переиспользован (`generate_validated_edit`). Прошли `security-auditor` (дизайн ПЕРВЫМ + аудит
+  реализации — чисто) + `qa-engineer` (43 pytest) + `/code-review`. **145 pytest + 31 vitest.** nginx
+  `~ .../(token|pr)$` (Bearer, 300s), systemd `HOME=/root` (для `gh`). **Прод:** `can_edit` в API; `/pr`
+  без confirm→400; token|pr за Bearer; невалидный PAT→400; токен не в логах.
 
 **Задачи.**
 - `security-auditor` (эксперт ПЕРВЫМ) — GitHub-доступ: **fine-grained PAT** с минимальным scope

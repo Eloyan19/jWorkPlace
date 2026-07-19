@@ -3,7 +3,8 @@
 > **🗣 Язык общения — всегда русский.** Весь прозаический текст (анализ, планы, вопросы,
 > объяснения) — на русском. Имена кода, команды, идентификаторы — латиницей.
 
-> ✅ **Стадия: Этап 2b задеплоен — grounded-чат по коду живёт по HTTPS.** Готово: `CLAUDE.md`
+> ✅ **Стадия: Этап 3b задеплоен — реальный PR через per-project PAT живёт по HTTPS (авто-проверки
+> пройдены; ручная проверка реального PR ждёт PAT+тестового репо пользователя).** Готово: `CLAUDE.md`
 > (правила/инварианты/агенты), **`PLAN.md`** (поэтапный deploy-first роадмап — **прочитай его перед
 > работой над реализацией**), 11 агентов Слоя A, публичный репо `Eloyan19/jWorkPlace`.
 > Этап 0: `backend/app/` (FastAPI, `/api/health`, `LlmService`-абстракция), фронт health-индикатор, деплой.
@@ -42,9 +43,26 @@
 > **Прод живой:** вставил ссылку → `ready`; спросил по коду → grounded-ответ с источниками
 > `file::symbol::строки` + дословный quote; off-topic → «не знаю» без генерации. Секреты гейтятся до
 > эмбеддинга (fail-closed на gitleaks) и маскируются `redact` до LLM/клиента.
-> **Следующий шаг — Этап 3b** из `PLAN.md` (реальный PR: fine-grained PAT в env, writable-клон, ветка
-> `jworkplace/<feature>`, push, PR через `gh`, human-in-the-loop confirm — требует PAT пользователя +
-> его тестовый репо).
+> **Этап 3b (реальный PR через per-project fine-grained PAT):** `config.py` (`JWP_SECRET_KEY`+`fernet()`
+> fail-closed, `worktrees_dir`), `db.py` (`github_token_enc` BLOB + идемпотентная миграция, set/get/clear
+> token), `edit/github.py` (`validate_token` — push+full_name против репо ИМЕННО проекта; `encrypt/decrypt`
+> Fernet; `open_pr` — writable-клон в `worktrees/<pid>` БЕЗ blob:none → `git apply` → ветка
+> `jworkplace/<slug>` → bot-commit → push; токен git-у ТОЛЬКО через env `GIT_CONFIG_*` http.extraHeader,
+> `gh pr create` через `GH_TOKEN` env — никогда argv/URL/reflog; stderr+PR-body через `redact`),
+> `api/edit.py` (`generate_validated_edit` — единый серверный источник diff для `/edit` и `/pr`),
+> `api/projects.py` (`PUT/DELETE /token`; `POST /pr` — human-in-the-loop: confirm + **регенерация+сверка**
+> diff, 409 на расхождение, guard от гонки, fail-closed, `_project_dto` allowlist+`can_edit`). Фронт:
+> `ProjectsPanel` (поле PAT password, не в localStorage, бейдж can_edit), `EditPanel` (кнопка «Подтвердить
+> и открыть PR» с `expected_diff`, ссылка на PR, 409 «превью устарело»). nginx `~ .../(token|pr)$` (Bearer,
+> 300s), systemd `HOME=/root` (для `gh`). Прошли security-auditor (дизайн + аудит реализации — чисто) +
+> qa-engineer (43 pytest) + `/code-review` (3 находки: validate_token best-effort по scope, guard гонки
+> `/pr`, мёртвый `project_can_edit`). **145 pytest + 31 vitest.**
+> **Прод живой (deploy 594705a):** `GET /api/projects` отдаёт `can_edit`; `/pr` без confirm → 400;
+> nginx token|pr за Bearer (401 без); `PUT /token` невалидным токеном → 400 (валидация против GitHub);
+> тестовый токен не в логах; `HOME`/`gh` доступны процессу. **Ручная проверка реального PR — за
+> пользователем** (нужен fine-grained PAT + тестовый репо; инструкция выдана).
+> **Следующий шаг — Этап 4** из `PLAN.md` (рой агентов Слоя B на DeepSeek function-calling: analyzer →
+> planner/critic → coder → reviewer → judge → PR; переиспользует hybrid search Этапа 2 и PR-флоу 3b).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
 
 ---
