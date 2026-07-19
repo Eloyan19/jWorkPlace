@@ -70,7 +70,7 @@
 > `_target`, `permissions:{}`+job минимум, PR title/body через env против script-injection, форки
 > fail-closed, обновление ОДНОГО комментария по маркеру), nginx `~ .../review$` (Bearer, 180s),
 > `eval/review_quality.py`. Эксперты (llm+architect+security ПЕРВЫМИ) + аудит реализации (чисто) + qa
-> (32 pytest) + `/code-review`. **177 pytest.** Прод (deploy <sha>): `/review` за Bearer, 422 на большой
+> (32 pytest) + `/code-review`. **177 pytest.** Прод (deploy 07b5d6b): `/review` за Bearer, 422 на большой
 > diff, `[REDACTED]` на секрет, «approve»-инъекция не проходит. **Ручная (dogfood) — за пользователем:**
 > 3 secrets (`JWP_BACKEND_URL`/`JWP_GATE_TOKEN`/`JWP_PROJECT_ID`) + push workflow в origin + тестовый PR.
 > **Следующий шаг — Этап 4** из `PLAN.md` (рой агентов Слоя B на DeepSeek function-calling: analyzer →
