@@ -126,29 +126,43 @@ def _loads_tolerant(raw: str) -> dict:
         return json.loads(match.group(0))
 
 
-def _read_excerpt(project_id: str, hit: dict) -> str | None:
-    """Прочитать срез start_line..end_line файла на диске. None — если путь выходит за
-    пределы клона проекта, файла нет или диапазон вне файла (индекс мог устареть)."""
+def safe_repo_path(project_id: str, file: str) -> Path | None:
+    """Разрешить `file` внутри клона `repos/<project_id>/` с traversal-guard.
+
+    None — если project_id или file уводят за пределы клона (`../`, абсолютный путь и т.п.).
+    Общий барьер путей — переиспользуется grounding (валидация цитат) и edit/patcher (правки).
+    """
     settings = get_settings()
     repos_dir = settings.repos_dir.resolve()
     base = (repos_dir / project_id).resolve()
     try:
         base.relative_to(repos_dir)      # защита от ../ в project_id (defense-in-depth)
-        path = (base / hit["file"]).resolve()
-        path.relative_to(base)           # защита от ../ в hit["file"]
+        path = (base / file).resolve()
+        path.relative_to(base)           # защита от ../ в file
     except (ValueError, OSError):
         return None
-    if not path.is_file():
+    return path
+
+
+def read_span(project_id: str, file: str, start_line: int, end_line: int) -> str | None:
+    """Прочитать срез start_line..end_line файла на диске. None — если путь выходит за
+    пределы клона проекта, файла нет или диапазон вне файла (индекс мог устареть)."""
+    path = safe_repo_path(project_id, file)
+    if path is None or not path.is_file():
         return None
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     lines = text.splitlines(keepends=True)
-    start_line, end_line = hit["start_line"], hit["end_line"]
     if start_line < 1 or start_line > len(lines):
         return None
     return "".join(lines[start_line - 1:min(end_line, len(lines))])
+
+
+def _read_excerpt(project_id: str, hit: dict) -> str | None:
+    """Прочитать срез строк для валидации цитаты — обёртка над read_span по полям hit."""
+    return read_span(project_id, hit["file"], hit["start_line"], hit["end_line"])
 
 
 def _normalize(text: str) -> str:

@@ -61,3 +61,31 @@ export interface ChatResponse {
   abstain: boolean
   sources: ChatSource[]
 }
+
+// Правка → предпросмотр diff (Этап 3a). Источник тот же формат цитаты, что в чате, но без
+// поля id (правка не нумерует источники по ссылкам в тексте ответа).
+export interface EditSource {
+  file: string
+  citation: string
+  quote: string
+}
+
+export interface EditItem {
+  file: string
+  reason: string
+}
+
+// Union по полю ok: успех несёт diff/summary/edits/sources, отказ — только reason.
+export type EditResponse =
+  | {
+      ok: true
+      summary: string
+      diff: string
+      edits: EditItem[]
+      sources: EditSource[]
+      dropped: number
+    }
+  | {
+      ok: false
+      reason: string
+    }

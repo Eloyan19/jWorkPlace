@@ -1,4 +1,5 @@
 import ChatPanel from './components/ChatPanel'
+import EditPanel from './components/EditPanel'
 import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
 import SearchPanel from './components/SearchPanel'
@@ -14,6 +15,7 @@ function App() {
         <HealthIndicator />
         <ProjectsPanel />
         <ChatPanel />
+        <EditPanel />
         <SearchPanel />
       </main>
     </div>

@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatResponse, Health, Project, SearchResponse } from './types'
+import type { ChatMessage, ChatResponse, EditResponse, Health, Project, SearchResponse } from './types'
 
 // Инвариант: только относительный путь. В dev его проксирует Vite (vite.config.ts ->
 // server.proxy['/api']), в проде — nginx (server_name jwork.jorchik.com, /api/* -> :8200).
@@ -116,4 +116,18 @@ export async function sendChat(
     throw new Error(await readErrorMessage(res))
   }
   return (await res.json()) as ChatResponse
+}
+
+// Правка → предпросмотр diff (Этап 3a). ok:false в теле — не HTTP-ошибка (сервер отказался
+// собрать правку по гейту grounding), поэтому проверяем только res.ok (транспорт).
+export async function proposeEdit(projectId: string, instruction: string): Promise<EditResponse> {
+  const res = await fetch(`/api/projects/${projectId}/edit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ instruction }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as EditResponse
 }
