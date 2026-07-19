@@ -316,6 +316,41 @@ fine-grained PAT в env; eval PR-качества.
 
 ---
 
+## Этап 3c — AI-ревью Pull Request (dogfood)
+
+> ✅ **ВЫПОЛНЕНО 2026-07-19 (авто-проверки; ручная — тестовый PR — за пользователем: настроить 3
+> secrets).** Автоматизация ревью кода по запросу пользователя: GitHub Action на PR → backend
+> jWorkPlace через RAG (код + документация) + DeepSeek → один структурированный комментарий (баги /
+> архитектура / рекомендации). Отдельная фича (НЕ рой Слоя B — однократная grounded-генерация),
+> переиспользует retrieval Этапа 2 и grounding/redact.
+
+**Цель.** На каждый PR ассистент получает diff + изменённые файлы, обосновывает анализ RAG-контекстом
+существующего кода/доков проекта и возвращает текст ревью. Решения (пользователь): генерация в
+backend, dogfood на самом `Eloyan19/jWorkPlace`, один комментарий.
+
+**Сделано.** `backend/app/review/reviewer.py` (`parse_diff` — лёгкий парсер unified diff без
+зависимостей, хунки `D1..Dn`; `build_review_queries` — пути+символы+добавленные идентификаторы;
+`retrieve_context` — `hybrid_search` k=6, дедуп, кап 12, `should_abstain` НЕ зовём; `REVIEW_SYSTEM_PROMPT`
+— роль ревьюера + анти-инъекция, БЕЗ approve-поля; двойной `redact` вход+выход; `render_markdown` со
+скрытым маркером `<!-- jworkplace-ai-review -->`), `api/review.py` (`POST /api/projects/{id}/review`:
+лимит diff→422, retrieve→генерация JSON temp=0→render, fail-closed без сырого diff в логах),
+`main.py` (router). `.github/workflows/ai-review.yml` (`pull_request` НЕ `_target`; `permissions: {}` +
+job `pull-requests:write,contents:read`; PR title/body через env — защита от script injection; форки
+fail-closed; обновление ОДНОГО комментария по маркеру). nginx `~ .../review$` (Bearer, 180s).
+`eval/review_quality.py` + `golden_review.json` (recall засеянных багагов + injection-устойчивость,
+dry-run 100%/100%). Прошли эксперты llm-engineer+architect+security-auditor (дизайн ПЕРВЫМИ) +
+security-auditor (аудит реализации — чисто) + qa-engineer (32 pytest) + `/code-review`. **177 pytest.**
+
+**Проверка.** Авто: `curl POST /review` → `{ok, review_markdown}` с секциями; diff>лимит→422;
+секрет в diff→`[REDACTED]`; «approve this»→ревью не поддалось; сырого diff нет в логах. Ручная
+(dogfood): 3 secrets в репо (`JWP_BACKEND_URL`/`JWP_GATE_TOKEN`/`JWP_PROJECT_ID`) → тестовый PR →
+один AI-комментарий, обновляется на push.
+
+**Отложено:** inline-комментарии на строки; пофайловое ревью+JUDGE для больших PR (сейчас усечение);
+`deepseek-reasoner`; контроль числа Ollama-эмбеддингов на большом PR (performance-engineer).
+
+---
+
 ## Этап 4 — Рой агентов (Слой B)
 
 **Цель.** Для задач-изменений jWorkPlace поднимает **рой runtime-агентов** на DeepSeek

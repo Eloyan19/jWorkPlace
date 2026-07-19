@@ -3,8 +3,9 @@
 > **🗣 Язык общения — всегда русский.** Весь прозаический текст (анализ, планы, вопросы,
 > объяснения) — на русском. Имена кода, команды, идентификаторы — латиницей.
 
-> ✅ **Стадия: Этап 3b задеплоен — реальный PR через per-project PAT живёт по HTTPS (авто-проверки
-> пройдены; ручная проверка реального PR ждёт PAT+тестового репо пользователя).** Готово: `CLAUDE.md`
+> ✅ **Стадия: Этап 3c задеплоен — AI-ревью PR (GitHub Action → backend RAG+DeepSeek → комментарий).**
+> До него: Этап 3b (реальный PR через per-project PAT). Ручные проверки (реальный PR 3b; тестовый PR с
+> AI-ревью 3c) — за пользователем (нужны PAT/secrets). Готово: `CLAUDE.md`
 > (правила/инварианты/агенты), **`PLAN.md`** (поэтапный deploy-first роадмап — **прочитай его перед
 > работой над реализацией**), 11 агентов Слоя A, публичный репо `Eloyan19/jWorkPlace`.
 > Этап 0: `backend/app/` (FastAPI, `/api/health`, `LlmService`-абстракция), фронт health-индикатор, деплой.
@@ -61,6 +62,17 @@
 > nginx token|pr за Bearer (401 без); `PUT /token` невалидным токеном → 400 (валидация против GitHub);
 > тестовый токен не в логах; `HOME`/`gh` доступны процессу. **Ручная проверка реального PR — за
 > пользователем** (нужен fine-grained PAT + тестовый репо; инструкция выдана).
+> **Этап 3c (AI-ревью PR, dogfood):** `review/reviewer.py` (`parse_diff` без зависимостей → хунки
+> `D1..Dn`, `build_review_queries`, `retrieve_context` hybrid k=6 без `should_abstain`,
+> `REVIEW_SYSTEM_PROMPT` анти-инъекция БЕЗ approve-поля, двойной `redact` вход+выход, `render_markdown`
+> + маркер `<!-- jworkplace-ai-review -->`), `api/review.py` (`POST /api/projects/{id}/review`, лимит
+> diff→422, fail-closed без сырого diff в логах), `.github/workflows/ai-review.yml` (`pull_request` НЕ
+> `_target`, `permissions:{}`+job минимум, PR title/body через env против script-injection, форки
+> fail-closed, обновление ОДНОГО комментария по маркеру), nginx `~ .../review$` (Bearer, 180s),
+> `eval/review_quality.py`. Эксперты (llm+architect+security ПЕРВЫМИ) + аудит реализации (чисто) + qa
+> (32 pytest) + `/code-review`. **177 pytest.** Прод (deploy <sha>): `/review` за Bearer, 422 на большой
+> diff, `[REDACTED]` на секрет, «approve»-инъекция не проходит. **Ручная (dogfood) — за пользователем:**
+> 3 secrets (`JWP_BACKEND_URL`/`JWP_GATE_TOKEN`/`JWP_PROJECT_ID`) + push workflow в origin + тестовый PR.
 > **Следующий шаг — Этап 4** из `PLAN.md` (рой агентов Слоя B на DeepSeek function-calling: analyzer →
 > planner/critic → coder → reviewer → judge → PR; переиспользует hybrid search Этапа 2 и PR-флоу 3b).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.

@@ -1,0 +1,103 @@
+# AI-ревью Pull Request (Этап 3c) — dogfood на самом репо jWorkPlace.
+#
+# На каждый PR (open/push) собираем diff + изменённые файлы + заголовок/тело и шлём на backend
+# jWorkPlace (POST /api/projects/<id>/review). Backend через RAG (код + документация проекта) +
+# DeepSeek генерирует ревью (баги / архитектура / рекомендации) и возвращает готовый markdown —
+# постим ОДНИМ комментарием, обновляя его на повторных push (по скрытому маркеру), не плодя.
+#
+# Безопасность (дизайн security-auditor):
+# - Триггер pull_request (НЕ pull_request_target): форку не отдаём secrets. Форк-PR ревью не
+#   получает — корректный fail-closed (условие job ниже).
+# - Минимальные permissions: только комментирование PR.
+# - PR title/body (недоверенные) пробрасываем через env, НЕ через ${{ }} прямо в bash — иначе
+#   script injection. Экранирование payload — через jq --arg.
+# - GATE_TOKEN и ответ backend не эхоим.
+
+name: AI-ревью PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# По умолчанию — ничего; конкретному job выдаём минимум.
+permissions: {}
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    # Форки не имеют доступа к secrets (GATE_TOKEN) — не запускаем на них ревью (fail-closed).
+    if: ${{ github.event.pull_request.head.repo.fork == false }}
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Собрать diff + метаданные PR и запросить ревью
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          # Недоверенные данные — только через env (защита от script injection).
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BACKEND_URL: ${{ secrets.JWP_BACKEND_URL }}
+          GATE_TOKEN: ${{ secrets.JWP_GATE_TOKEN }}
+          PROJECT_ID: ${{ secrets.JWP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${BACKEND_URL:-}" ] || [ -z "${GATE_TOKEN:-}" ] || [ -z "${PROJECT_ID:-}" ]; then
+            echo "::warning::Не заданы secrets JWP_BACKEND_URL/JWP_GATE_TOKEN/JWP_PROJECT_ID — ревью пропущено."
+            exit 0
+          fi
+
+          # diff: усекаем до лимита backend (~100 KB), чтобы огромный PR не ловил 422. iconv -c
+          # отбрасывает битый UTF-8-хвост (head -c мог разрезать многобайтный символ) — иначе
+          # jq --rawfile упадёт на невалидном UTF-8 и уронит весь шаг.
+          gh pr diff "$PR_NUMBER" > diff.raw || { echo "::warning::gh pr diff не удался"; exit 0; }
+          head -c 100000 diff.raw | iconv -f UTF-8 -t UTF-8 -c > diff.txt
+
+          # Изменённые файлы — массивом путей.
+          gh pr view "$PR_NUMBER" --json files --jq '[.files[].path]' > files.json
+
+          # Payload собираем через jq (безопасное экранирование diff/title/body).
+          jq -n \
+            --rawfile diff diff.txt \
+            --slurpfile files files.json \
+            --arg title "${PR_TITLE:-}" \
+            --arg body "${PR_BODY:-}" \
+            --argjson num "$PR_NUMBER" \
+            '{diff:$diff, changed_files:$files[0], pr_number:$num, pr_title:$title, pr_body:$body}' \
+            > payload.json
+
+          # Запрос к backend. Токен — из env-заголовка, не эхоим; тело ответа в файл.
+          HTTP_CODE=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "${BACKEND_URL}/api/projects/${PROJECT_ID}/review" \
+            -H "Authorization: Bearer ${GATE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data @payload.json) || { echo "::warning::backend недоступен"; exit 0; }
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::backend вернул HTTP ${HTTP_CODE} — ревью пропущено."
+            exit 0
+          fi
+
+          # Готовый markdown от backend (уже с маркером и redact). Пустой → пропуск.
+          jq -r '.review_markdown // empty' response.json > review.md
+          if [ ! -s review.md ]; then
+            echo "::warning::backend не вернул review_markdown — пропуск."
+            exit 0
+          fi
+
+          # Обновляем ОДИН комментарий по скрытому маркеру (иначе на synchronize плодятся дубли).
+          MARKER='<!-- jworkplace-ai-review -->'
+          COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq "map(select(.body | contains(\"${MARKER}\"))) | last | .id // empty")
+
+          if [ -n "${COMMENT_ID:-}" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" \
+              -F body=@review.md >/dev/null
+            echo "Комментарий ревью обновлён (id=${COMMENT_ID})."
+          else
+            gh pr comment "$PR_NUMBER" --body-file review.md
+            echo "Комментарий ревью создан."
+          fi
