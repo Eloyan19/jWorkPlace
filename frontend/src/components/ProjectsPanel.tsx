@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { createProject, deleteProjectToken, listProjects, putProjectToken, reindexProject } from '../api'
+import {
+  createProject,
+  deleteProject,
+  deleteProjectToken,
+  listProjects,
+  putProjectToken,
+  rebuildProject,
+  reindexProject,
+} from '../api'
 import { clearActiveProject, readActiveProject, writeActiveProject } from '../activeProject'
 import type { Project, ProjectStatus } from '../types'
 
@@ -30,7 +38,8 @@ function ProjectsPanel() {
   const [formError, setFormError] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(() => readActiveProject())
-  const [reindexingId, setReindexingId] = useState<string | null>(null)
+  // Одна операция над строкой проекта за раз (обновить/переиндексировать заново/удалить/reindex у error).
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   // Правки (Этап 3b): токен вводится и отправляется — не храним и не показываем обратно,
   // поле очищается сразу после запроса (успех или провал).
@@ -124,7 +133,7 @@ function ProjectsPanel() {
   }
 
   async function handleReindex(id: string) {
-    setReindexingId(id)
+    setBusyId(id)
     try {
       await reindexProject(id)
       if (!mountedRef.current) return
@@ -133,7 +142,46 @@ function ProjectsPanel() {
       if (!mountedRef.current) return
       setListError(err instanceof Error ? err.message : 'не удалось запустить переиндексацию')
     } finally {
-      if (mountedRef.current) setReindexingId(null)
+      if (mountedRef.current) setBusyId(null)
+    }
+  }
+
+  async function handleRebuild(id: string) {
+    if (!window.confirm(
+      'Переиндексировать заново? Репозиторий будет склонирован с нуля и полностью переиндексирован.',
+    )) return
+    setBusyId(id)
+    try {
+      await rebuildProject(id)
+      if (!mountedRef.current) return
+      await refresh()
+    } catch (err) {
+      if (!mountedRef.current) return
+      setListError(err instanceof Error ? err.message : 'не удалось переиндексировать заново')
+    } finally {
+      if (mountedRef.current) setBusyId(null)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm(
+      'Удалить проект? Клон, индекс и все метаданные будут удалены безвозвратно.',
+    )) return
+    setBusyId(id)
+    try {
+      await deleteProject(id)
+      if (!mountedRef.current) return
+      // Удалили активный проект → снимаем выбор (контексты не должны ссылаться на исчезнувший id).
+      if (activeIdRef.current === id) {
+        clearActiveProject()
+        setActiveId(null)
+      }
+      await refresh()
+    } catch (err) {
+      if (!mountedRef.current) return
+      setListError(err instanceof Error ? err.message : 'не удалось удалить проект')
+    } finally {
+      if (mountedRef.current) setBusyId(null)
     }
   }
 
@@ -226,13 +274,43 @@ function ProjectsPanel() {
                     type="button"
                     className="project-reindex"
                     onClick={() => handleReindex(project.id)}
-                    disabled={reindexingId === project.id}
+                    disabled={busyId === project.id}
                   >
-                    {reindexingId === project.id ? 'переиндексация…' : 'Переиндексировать'}
+                    {busyId === project.id ? 'переиндексация…' : 'Переиндексировать'}
                   </button>
                 </>
               )}
               {project.status === 'ready' && (
+                <>
+                <div className="project-actions">
+                  <button
+                    type="button"
+                    className="project-action"
+                    onClick={() => handleReindex(project.id)}
+                    disabled={busyId === project.id}
+                    title="Быстрое инкрементальное обновление (fetch + переиндексация изменённого)"
+                  >
+                    {busyId === project.id ? '…' : 'Обновить'}
+                  </button>
+                  <button
+                    type="button"
+                    className="project-action"
+                    onClick={() => handleRebuild(project.id)}
+                    disabled={busyId === project.id}
+                    title="Полный re-clone с нуля и переиндексация (для сильно изменившегося репо)"
+                  >
+                    Переиндексировать заново
+                  </button>
+                  <button
+                    type="button"
+                    className="project-action project-action-danger"
+                    onClick={() => handleDelete(project.id)}
+                    disabled={busyId === project.id}
+                    title="Удалить проект: клон, индекс и метаданные"
+                  >
+                    Удалить
+                  </button>
+                </div>
                 <div className="project-token">
                   <span className={`badge ${project.can_edit ? 'badge-editable' : 'badge-readonly'}`}>
                     {project.can_edit ? '✅ правки включены' : '🔒 read-only'}
@@ -277,6 +355,7 @@ function ProjectsPanel() {
                     <span className="project-error-text">{tokenError[project.id]}</span>
                   )}
                 </div>
+                </>
               )}
             </li>
           ))}

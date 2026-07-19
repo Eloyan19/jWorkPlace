@@ -95,6 +95,30 @@ export async function reindexProject(id: string): Promise<{ status: string }> {
   return (await res.json()) as { status: string }
 }
 
+// Полная переиндексация «с нуля» (Этап управления репо): свежий re-clone + пересборка индекса.
+// Отличие от reindexProject — сервер клонирует заново, а не fetch+reset (для сильно разошедшихся репо).
+export async function rebuildProject(id: string): Promise<{ status: string }> {
+  const res = await fetch(`/api/projects/${id}/rebuild`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { status: string }
+}
+
+export async function deleteProject(id: string): Promise<{ deleted: boolean }> {
+  const res = await fetch(`/api/projects/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { deleted: boolean }
+}
+
 // Включить правки (Этап 3b): backend валидирует токен против самого репо (push-право +
 // совпадение full_name) прежде чем сохранить — здесь просто отправляем и разбираем ответ.
 // Токен нигде на фронте не сохраняем и не логируем; поле очищаем сразу после вызова (компонент).

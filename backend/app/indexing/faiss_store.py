@@ -5,6 +5,7 @@
 Этапа 2). Инвариант: faiss_id = порядок вставки вектора == chunks.faiss_id. Инкремент = полный
 ребилд из кэша (IndexFlatIP не удаляет по id), почти бесплатный.
 """
+import shutil
 from pathlib import Path
 
 import faiss
@@ -38,6 +39,15 @@ def build_index(project_id: str, vectors: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     faiss.write_index(index, str(path))
     _invalidate(project_id)  # старый индекс в кэше устарел после ребилда
+
+
+def delete_index(project_id: str) -> None:
+    """Удалить FAISS-индекс проекта (каталог indexes/<id>/) и сбросить LRU-кэш, если он держит
+    этот проект. Идемпотентно (нет каталога — ничего не делаем)."""
+    index_dir = _index_path(project_id).parent
+    if index_dir.exists():
+        shutil.rmtree(index_dir, ignore_errors=True)
+    _invalidate(project_id)
 
 
 def load_index(project_id: str) -> faiss.Index | None:

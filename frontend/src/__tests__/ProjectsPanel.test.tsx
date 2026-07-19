@@ -79,7 +79,8 @@ describe('ProjectsPanel', () => {
     })
     expect(screen.getByText('ошибка')).toBeInTheDocument()
     expect(screen.getByText('что-то пошло не так')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Переиндексировать/i })).toBeInTheDocument()
+    // exact-имя: у error-проекта «Переиндексировать», не спутать с «Переиндексировать заново» у ready.
+    expect(screen.getByRole('button', { name: 'Переиндексировать' })).toBeInTheDocument()
   })
 
   it('клик по проекту делает его активным', async () => {
@@ -178,5 +179,187 @@ describe('ProjectsPanel', () => {
       expect(mockedApi.deleteProjectToken).toHaveBeenCalledWith('p1')
     })
     await waitFor(() => expect(screen.getByText('🔒 read-only')).toBeInTheDocument())
+  })
+
+  it('ready-проект имеет три кнопки: Обновить, Переиндексировать заново, Удалить', async () => {
+    mockedApi.listProjects.mockResolvedValue([makeProject({ id: 'p1', status: 'ready' })])
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() => {
+      expect(screen.getByText('repo')).toBeInTheDocument()
+    })
+
+    // Три кнопки у ready-проекта
+    expect(screen.getByRole('button', { name: /^Обновить$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Переиндексировать заново$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Удалить$/i })).toBeInTheDocument()
+  })
+
+  it('кнопка «Обновить» вызывает reindexProject БЕЗ подтверждения', async () => {
+    mockedApi.listProjects
+      .mockResolvedValueOnce([makeProject({ status: 'ready' })])
+      .mockResolvedValueOnce([makeProject({ status: 'ready' })])
+    mockedApi.reindexProject.mockResolvedValue({ status: 'cloning' })
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Обновить$/i })).toBeInTheDocument())
+
+    const updateBtn = screen.getByRole('button', { name: /^Обновить$/i })
+    fireEvent.click(updateBtn)
+
+    // Без confirm
+    await waitFor(() => {
+      expect(mockedApi.reindexProject).toHaveBeenCalledWith('p1')
+    })
+  })
+
+  it('кнопка «Переиндексировать заново» требует confirm перед вызовом rebuildProject', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    mockedApi.listProjects.mockResolvedValue([makeProject({ status: 'ready' })])
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Переиндексировать заново$/i })).toBeInTheDocument()
+    )
+
+    const rebuildBtn = screen.getByRole('button', { name: /^Переиндексировать заново$/i })
+    fireEvent.click(rebuildBtn)
+
+    // confirm→false → rebuildProject НЕ вызывается
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(mockedApi.rebuildProject).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
+  })
+
+  it('кнопка «Переиндексировать заново» с confirm=true вызывает rebuildProject', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockedApi.listProjects
+      .mockResolvedValueOnce([makeProject({ status: 'ready' })])
+      .mockResolvedValueOnce([makeProject({ status: 'cloning' })])
+    mockedApi.rebuildProject.mockResolvedValue({ status: 'cloning' })
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Переиндексировать заново$/i })).toBeInTheDocument()
+    )
+
+    const rebuildBtn = screen.getByRole('button', { name: /^Переиндексировать заново$/i })
+    fireEvent.click(rebuildBtn)
+
+    await waitFor(() => {
+      expect(mockedApi.rebuildProject).toHaveBeenCalledWith('p1')
+    })
+
+    confirmSpy.mockRestore()
+  })
+
+  it('кнопка «Удалить» требует confirm перед вызовом deleteProject', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    mockedApi.listProjects.mockResolvedValue([makeProject({ status: 'ready' })])
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Удалить$/i })).toBeInTheDocument())
+
+    const deleteBtn = screen.getByRole('button', { name: /^Удалить$/i })
+    fireEvent.click(deleteBtn)
+
+    // confirm→false → deleteProject НЕ вызывается
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(mockedApi.deleteProject).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
+  })
+
+  it('кнопка «Удалить» с confirm=true вызывает deleteProject и удаляет проект из списка', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockedApi.listProjects
+      .mockResolvedValueOnce([makeProject({ id: 'p1' })])
+      .mockResolvedValueOnce([]) // Проект исчез из списка
+    mockedApi.deleteProject.mockResolvedValue({ deleted: true })
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() => {
+      expect(screen.getByText('repo')).toBeInTheDocument()
+    })
+
+    const deleteBtn = screen.getByRole('button', { name: /^Удалить$/i })
+    fireEvent.click(deleteBtn)
+
+    await waitFor(() => {
+      expect(mockedApi.deleteProject).toHaveBeenCalledWith('p1')
+    })
+
+    // Проект исчез из списка
+    await waitFor(() => {
+      expect(screen.queryByText('repo')).not.toBeInTheDocument()
+    })
+
+    confirmSpy.mockRestore()
+  })
+
+  it('удаление активного проекта сбрасывает activeId и вызывает clearActiveProject', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockedApi.listProjects
+      .mockResolvedValueOnce([makeProject({ id: 'p1' })])
+      .mockResolvedValueOnce([])
+    mockedApi.deleteProject.mockResolvedValue({ deleted: true })
+
+    render(<ProjectsPanel />)
+
+    // Делаем проект активным
+    await waitFor(() => {
+      expect(screen.getByText('repo')).toBeInTheDocument()
+    })
+    const selectBtn = screen.getByText('repo').closest('button')
+    fireEvent.click(selectBtn!)
+
+    // Проверяем, что он активен
+    await waitFor(() => {
+      expect(selectBtn).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // Удаляем активный проект
+    const deleteBtn = screen.getByRole('button', { name: /^Удалить$/i })
+    fireEvent.click(deleteBtn)
+
+    await waitFor(() => {
+      expect(mockedApi.deleteProject).toHaveBeenCalledWith('p1')
+    })
+
+    // activeId сбросился (в localStorage не должно быть 'p1')
+    await waitFor(() => {
+      expect(localStorage.getItem('jwp_active_project')).not.toBe('p1')
+    })
+
+    confirmSpy.mockRestore()
+  })
+
+  it('error-проект имеет кнопку «Переиндексировать» (без «заново»)', async () => {
+    mockedApi.listProjects.mockResolvedValue([
+      makeProject({ id: 'p1', status: 'error', error: 'что-то пошло не так' }),
+    ])
+
+    render(<ProjectsPanel />)
+
+    await waitFor(() => {
+      expect(screen.getByText('ошибка')).toBeInTheDocument()
+    })
+
+    // У error-проекта одна кнопка переиндексации (без «заново»)
+    const reindexBtns = screen.queryAllByRole('button', { name: /Переиндексировать/i })
+    // У error'а должна быть ровно одна (без слова «заново»)
+    const errorReindexBtns = reindexBtns.filter((btn) =>
+      btn.textContent?.includes('Переиндексировать') && !btn.textContent?.includes('заново')
+    )
+    expect(errorReindexBtns.length).toBeGreaterThan(0)
   })
 })

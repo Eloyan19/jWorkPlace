@@ -190,6 +190,16 @@ def project_can_edit(project_id: str) -> bool:
     return get_project_token_enc(project_id) is not None
 
 
+def delete_project(project_id: str) -> None:
+    """Удалить проект и его метаданные (projects + files + chunks) одной транзакцией. embed_cache
+    НЕ трогаем — он глобальный (dedup эмбеддингов по blob_sha между проектами/форками). FTS-таблицу
+    и FAISS-индекс чистит вызывающий (drop_fts, faiss_store.delete_index)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM chunks WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM files WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+
+
 def recover_stuck() -> int:
     """Проекты, застрявшие в in-progress после рестарта сервиса, → error. Возвращает число."""
     placeholders = ",".join("?" * len(IN_PROGRESS_STATUSES))

@@ -242,6 +242,38 @@ body {
   cursor: pointer;
 }
 
+/* --- Действия над проиндексированным проектом (обновить/заново/удалить) --- */
+.project-actions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.project-action {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbb;
+  background: none;
+  color: #444;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.project-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.project-action-danger {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+@media (prefers-color-scheme: dark) {
+  .project-action {
+    border-color: #555;
+    color: #ccc;
+  }
+}
+
 /* --- Токен правок / PR (Этап 3b) --- */
 .project-token {
   flex-basis: 100%;
