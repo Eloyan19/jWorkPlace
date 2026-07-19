@@ -1,4 +1,12 @@
-import type { ChatMessage, ChatResponse, EditResponse, Health, Project, SearchResponse } from './types'
+import type {
+  ChatMessage,
+  ChatResponse,
+  EditResponse,
+  Health,
+  PrResponse,
+  Project,
+  SearchResponse,
+} from './types'
 
 // Инвариант: только относительный путь. В dev его проксирует Vite (vite.config.ts ->
 // server.proxy['/api']), в проде — nginx (server_name jwork.jorchik.com, /api/* -> :8200).
@@ -87,6 +95,32 @@ export async function reindexProject(id: string): Promise<{ status: string }> {
   return (await res.json()) as { status: string }
 }
 
+// Включить правки (Этап 3b): backend валидирует токен против самого репо (push-право +
+// совпадение full_name) прежде чем сохранить — здесь просто отправляем и разбираем ответ.
+// Токен нигде на фронте не сохраняем и не логируем; поле очищаем сразу после вызова (компонент).
+export async function putProjectToken(id: string, token: string): Promise<{ can_edit: boolean }> {
+  const res = await fetch(`/api/projects/${id}/token`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { can_edit: boolean }
+}
+
+export async function deleteProjectToken(id: string): Promise<{ can_edit: boolean }> {
+  const res = await fetch(`/api/projects/${id}/token`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { can_edit: boolean }
+}
+
 export async function searchCode(
   projectId: string,
   query: string,
@@ -130,4 +164,25 @@ export async function proposeEdit(projectId: string, instruction: string): Promi
     throw new Error(await readErrorMessage(res))
   }
   return (await res.json()) as EditResponse
+}
+
+// Реальный PR (Этап 3b). Сервер регенерирует diff по instruction и сверяет с expected_diff
+// (тем, что пользователь видел в EditPanel) — расхождение возвращается 409 с тем же телом
+// {ok:false, reason}, поэтому это не транспортная ошибка: разбираем наравне с 200.
+export type PrResult = { status: number } & PrResponse
+
+export async function createPr(
+  projectId: string,
+  body: { instruction: string; expected_diff: string },
+): Promise<PrResult> {
+  const res = await fetch(`/api/projects/${projectId}/pr`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ confirm: true, ...body }),
+  })
+  if (!res.ok && res.status !== 409) {
+    throw new Error(await readErrorMessage(res))
+  }
+  const data = (await res.json()) as PrResponse
+  return { status: res.status, ...data }
 }

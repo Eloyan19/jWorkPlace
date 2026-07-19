@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS projects (
     head_sha    TEXT,
     indexed_at  TEXT,
     error       TEXT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    github_token_enc BLOB
 );
 
 CREATE TABLE IF NOT EXISTS files (
@@ -93,9 +94,19 @@ def init_db() -> None:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.repos_dir.mkdir(parents=True, exist_ok=True)
     settings.indexes_dir.mkdir(parents=True, exist_ok=True)
+    settings.worktrees_dir.mkdir(parents=True, exist_ok=True)
     with _connect(settings.db_path) as conn:
         conn.executescript(_SCHEMA)
+        _migrate_add_token_column(conn)
         conn.commit()
+
+
+def _migrate_add_token_column(conn: sqlite3.Connection) -> None:
+    """Этап 3b: БД, созданные до PAT-фичи, не имеют `github_token_enc`. Идемпотентно —
+    проверяем PRAGMA table_info перед ALTER (иначе повторный запуск упал бы "duplicate column")."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    if "github_token_enc" not in cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN github_token_enc BLOB")
 
 
 @contextmanager
@@ -148,6 +159,35 @@ def get_project(project_id: str) -> Optional[sqlite3.Row]:
 def list_projects() -> list[sqlite3.Row]:
     with get_conn() as conn:
         return conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
+
+
+def set_project_token(project_id: str, enc: bytes) -> None:
+    """Сохранить зашифрованный (Fernet) PAT проекта. Сырой токен сюда не попадает."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE projects SET github_token_enc = ? WHERE id = ?", (enc, project_id)
+        )
+
+
+def get_project_token_enc(project_id: str) -> Optional[bytes]:
+    """Зашифрованный PAT проекта (или None, если не привязан) — расшифровка на вызывающей стороне."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT github_token_enc FROM projects WHERE id = ?", (project_id,)
+        ).fetchone()
+        return row["github_token_enc"] if row else None
+
+
+def clear_project_token(project_id: str) -> None:
+    """Отвязать PAT — проект возвращается в read-only (можно смотреть/чатиться, нельзя PR)."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE projects SET github_token_enc = NULL WHERE id = ?", (project_id,)
+        )
+
+
+def project_can_edit(project_id: str) -> bool:
+    return get_project_token_enc(project_id) is not None
 
 
 def recover_stuck() -> int:

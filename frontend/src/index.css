@@ -242,6 +242,71 @@ body {
   cursor: pointer;
 }
 
+/* --- Токен правок / PR (Этап 3b) --- */
+.project-token {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge-editable {
+  background: rgba(46, 204, 113, 0.2);
+  color: #1f9d54;
+}
+
+.badge-readonly {
+  background: rgba(0, 0, 0, 0.08);
+  opacity: 0.75;
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge-readonly {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.project-token-form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.project-token-form input {
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  font-size: 0.82rem;
+  background: #fff;
+  color: inherit;
+  min-width: 12rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .project-token-form input {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+.project-token-form button,
+.project-token-disable {
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.4rem;
+  border: 1px solid #2f6fed;
+  background: none;
+  color: #2f6fed;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.project-token-form button:disabled,
+.project-token-disable:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* --- Чат по коду (Этап 2b) --- */
 .chat-panel {
   margin-top: 2.5rem;
@@ -503,11 +568,33 @@ body {
   background: #2f6fed;
   color: #fff;
   font-size: 0.95rem;
-  cursor: not-allowed;
+  cursor: pointer;
 }
 
 .edit-confirm-pr:disabled {
   opacity: 0.5;
+  cursor: default;
+}
+
+.edit-pr-hint {
+  margin-top: 0.6rem;
+}
+
+.edit-pr-success {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  color: #1f9d54;
+}
+
+.edit-pr-success a {
+  color: inherit;
+  word-break: break-all;
+}
+
+.edit-pr-stale {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  color: #b8860b;
 }
 
 .edit-form {

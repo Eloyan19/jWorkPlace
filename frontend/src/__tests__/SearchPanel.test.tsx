@@ -9,7 +9,15 @@ vi.mock('../api')
 const mockedApi = vi.mocked(api)
 
 function readyProject(): Project {
-  return { id: 'abc123', url: 'u', name: 'repo', status: 'ready', error: null, indexed_at: null }
+  return {
+    id: 'abc123',
+    url: 'u',
+    name: 'repo',
+    status: 'ready',
+    error: null,
+    indexed_at: null,
+    can_edit: false,
+  }
 }
 
 function searchResponse(over: Partial<SearchResponse> = {}): SearchResponse {

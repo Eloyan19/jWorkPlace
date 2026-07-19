@@ -13,3 +13,6 @@ tree_sitter_language_pack==1.12.5
 # Эмбеддинги/индекс
 faiss-cpu==1.14.3
 numpy==2.5.1
+
+# --- Этап 3b: PAT at rest (Fernet) ---
+cryptography==49.0.0

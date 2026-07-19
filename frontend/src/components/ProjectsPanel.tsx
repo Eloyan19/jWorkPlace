@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { createProject, listProjects, reindexProject } from '../api'
+import { createProject, deleteProjectToken, listProjects, putProjectToken, reindexProject } from '../api'
 import { clearActiveProject, readActiveProject, writeActiveProject } from '../activeProject'
 import type { Project, ProjectStatus } from '../types'
 
@@ -31,6 +31,12 @@ function ProjectsPanel() {
   const [listError, setListError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(() => readActiveProject())
   const [reindexingId, setReindexingId] = useState<string | null>(null)
+
+  // Правки (Этап 3b): токен вводится и отправляется — не храним и не показываем обратно,
+  // поле очищается сразу после запроса (успех или провал).
+  const [tokenInputs, setTokenInputs] = useState<Record<string, string>>({})
+  const [tokenBusy, setTokenBusy] = useState<Record<string, boolean>>({})
+  const [tokenError, setTokenError] = useState<Record<string, string | null>>({})
 
   // Гвард от setState после размонтирования (StrictMode делает mount→unmount→mount) —
   // тот же паттерн, что и cancelled-флаг в HealthIndicator.
@@ -131,6 +137,50 @@ function ProjectsPanel() {
     }
   }
 
+  async function handleEnableEdit(id: string) {
+    const token = (tokenInputs[id] ?? '').trim()
+    if (!token) return
+    setTokenBusy((prev) => ({ ...prev, [id]: true }))
+    setTokenError((prev) => ({ ...prev, [id]: null }))
+    try {
+      await putProjectToken(id, token)
+      if (!mountedRef.current) return
+      await refresh()
+    } catch (err) {
+      if (!mountedRef.current) return
+      setTokenError((prev) => ({
+        ...prev,
+        [id]: err instanceof Error ? err.message : 'не удалось включить правки',
+      }))
+    } finally {
+      // Токен не оставляем в поле независимо от исхода (успех/провал) — не пересвечиваем
+      // введённое значение. Гвард mountedRef — тот же паттерн, что и в остальных finally
+      // этого файла (handleReindex, handleDisableEdit).
+      if (mountedRef.current) {
+        setTokenInputs((prev) => ({ ...prev, [id]: '' }))
+        setTokenBusy((prev) => ({ ...prev, [id]: false }))
+      }
+    }
+  }
+
+  async function handleDisableEdit(id: string) {
+    setTokenBusy((prev) => ({ ...prev, [id]: true }))
+    setTokenError((prev) => ({ ...prev, [id]: null }))
+    try {
+      await deleteProjectToken(id)
+      if (!mountedRef.current) return
+      await refresh()
+    } catch (err) {
+      if (!mountedRef.current) return
+      setTokenError((prev) => ({
+        ...prev,
+        [id]: err instanceof Error ? err.message : 'не удалось отключить правки',
+      }))
+    } finally {
+      if (mountedRef.current) setTokenBusy((prev) => ({ ...prev, [id]: false }))
+    }
+  }
+
   return (
     <section className="projects-panel">
       <h2>Проекты</h2>
@@ -181,6 +231,52 @@ function ProjectsPanel() {
                     {reindexingId === project.id ? 'переиндексация…' : 'Переиндексировать'}
                   </button>
                 </>
+              )}
+              {project.status === 'ready' && (
+                <div className="project-token">
+                  <span className={`badge ${project.can_edit ? 'badge-editable' : 'badge-readonly'}`}>
+                    {project.can_edit ? '✅ правки включены' : '🔒 read-only'}
+                  </span>
+                  {project.can_edit ? (
+                    <button
+                      type="button"
+                      className="project-token-disable"
+                      onClick={() => handleDisableEdit(project.id)}
+                      disabled={tokenBusy[project.id]}
+                    >
+                      {tokenBusy[project.id] ? 'отключение…' : 'Отключить'}
+                    </button>
+                  ) : (
+                    <form
+                      className="project-token-form"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        handleEnableEdit(project.id)
+                      }}
+                    >
+                      <input
+                        type="password"
+                        value={tokenInputs[project.id] ?? ''}
+                        onChange={(e) =>
+                          setTokenInputs((prev) => ({ ...prev, [project.id]: e.target.value }))
+                        }
+                        placeholder="fine-grained GitHub PAT"
+                        aria-label={`GitHub-токен для ${project.name}`}
+                        disabled={tokenBusy[project.id]}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="submit"
+                        disabled={tokenBusy[project.id] || !(tokenInputs[project.id] ?? '').trim()}
+                      >
+                        {tokenBusy[project.id] ? 'проверка…' : 'Включить правки'}
+                      </button>
+                    </form>
+                  )}
+                  {tokenError[project.id] && (
+                    <span className="project-error-text">{tokenError[project.id]}</span>
+                  )}
+                </div>
               )}
             </li>
           ))}

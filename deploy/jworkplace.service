@@ -10,6 +10,9 @@ EnvironmentFile=/root/repos/jWorkPlace/backend/.env
 # Заполняется на деплое (см. deploy/README.md): короткий git-sha текущего релиза,
 # попадает в GET /api/health -> version. Пусто -> version="dev".
 Environment=GIT_SHA=
+# gh (Этап 3b, open_pr) читает свой конфиг из $HOME — systemd для root-сервиса HOME не выставляет
+# сам. Токен всё равно передаётся через GH_TOKEN env, не отсюда (см. edit/github.py).
+Environment=HOME=/root
 ExecStart=/root/repos/jWorkPlace/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8200
 Restart=always
 RestartSec=3

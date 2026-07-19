@@ -5,6 +5,8 @@ export interface Health {
 
 export type ProjectStatus = 'cloning' | 'scanning' | 'indexing' | 'ready' | 'error'
 
+// can_edit (Этап 3b) — свойство проекта, не сервиса: true, если проекту привязан валидный
+// per-project GitHub PAT (шифруется at rest на backend, сюда токен никогда не приходит).
 export interface Project {
   id: string
   url: string
@@ -12,6 +14,7 @@ export interface Project {
   status: ProjectStatus
   error?: string | null
   indexed_at?: string | null
+  can_edit: boolean
 }
 
 // Один фрагмент кода из hybrid search (Этап 2a). dense_score/bm25_score — сырые скоры каналов
@@ -84,6 +87,19 @@ export type EditResponse =
       edits: EditItem[]
       sources: EditSource[]
       dropped: number
+    }
+  | {
+      ok: false
+      reason: string
+    }
+
+// Реальный PR (Этап 3b). Сервер регенерирует diff и сверяет с показанным пользователю —
+// расхождение (проект переиндексирован/файлы изменились между предпросмотром и подтверждением)
+// возвращается как ok:false с reason (HTTP 409, см. api.ts::createPr).
+export type PrResponse =
+  | {
+      ok: true
+      pr_url: string
     }
   | {
       ok: false

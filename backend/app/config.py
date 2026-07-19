@@ -7,6 +7,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from cryptography.fernet import Fernet
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,11 @@ class Settings(BaseSettings):
     # Токен-барьер публичного URL (проверяется в nginx; backend его не валидирует, но
     # хранит здесь, чтобы redeploy мог пробросить его во фронт как VITE_API_TOKEN).
     gate_token: str = ""
+
+    # --- Per-project GitHub PAT at rest (Этап 3b) ---
+    # Ключ шифрования PAT (Fernet, 32 байта urlsafe-base64 — вывод Fernet.generate_key()).
+    # Пустой/невалидный ключ → fail-closed: token/pr-эндпоинты отказывают, а не падают молча.
+    jwp_secret_key: str = ""
 
     # --- Индексация (Этап 1) ---
     ollama_url: str = "http://127.0.0.1:11434"
@@ -59,7 +65,29 @@ class Settings(BaseSettings):
     def indexes_dir(self) -> Path:
         return self.data_dir / "indexes"
 
+    @property
+    def worktrees_dir(self) -> Path:
+        """Писабельные клоны для PR-флоу (Этап 3b) — отдельно от read-only repos_dir."""
+        return self.data_dir / "worktrees"
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+class SecretKeyError(RuntimeError):
+    """JWP_SECRET_KEY пуст или не 32-байтный urlsafe-base64 — токен-функции fail-closed."""
+
+
+def fernet(settings: Settings) -> Fernet:
+    """Построить Fernet из JWP_SECRET_KEY. Fail-closed: невалидный/пустой ключ → SecretKeyError,
+    а не тихий откат — иначе PAT рисковали бы записаться нешифрованными или с предсказуемым ключом."""
+    if not settings.jwp_secret_key:
+        raise SecretKeyError("JWP_SECRET_KEY не задан — функции токена отключены (fail-closed).")
+    try:
+        return Fernet(settings.jwp_secret_key.encode("ascii"))
+    except (ValueError, TypeError) as exc:
+        raise SecretKeyError(
+            "JWP_SECRET_KEY невалиден (нужен 32-байтный urlsafe-base64, см. Fernet.generate_key())."
+        ) from exc

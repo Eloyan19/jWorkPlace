@@ -52,9 +52,22 @@ async def propose_edit(project_id: str, req: EditRequest) -> dict:
         raise HTTPException(status_code=409, detail="Проект ещё не готов — дождитесь индексации.")
 
     try:
-        hits = await asyncio.to_thread(hybrid.hybrid_search, project_id, instruction, _K)
+        result = await generate_validated_edit(project_id, instruction)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("сбой генерации /edit project_id=%s", project_id)
+        raise HTTPException(status_code=500, detail="внутренняя ошибка")
+
+    return result
+
+
+async def generate_validated_edit(project_id: str, instruction: str) -> dict:
+    """Единый серверный источник diff: retrieve → гейт `should_abstain` (без LLM при abstain) →
+    генерация структурированных edits → line-based валидация → детерминированная сборка diff →
+    `git apply --check`. Переиспользуется `/edit` (превью) и `/pr` (реальный PR, Этап 3b) — сервер
+    НИКОГДА не доверяет diff, присланному клиентом, только тому, что сам только что сгенерировал."""
+    hits = await asyncio.to_thread(hybrid.hybrid_search, project_id, instruction, _K)
 
     abstain, _reason = hybrid.should_abstain(hits)
     if abstain:
@@ -63,11 +76,7 @@ async def propose_edit(project_id: str, req: EditRequest) -> dict:
         return _cannot()
 
     context_hits = hits[:_CONTEXT_N]
-    try:
-        summary, edits, dropped = await _generate(project_id, instruction, context_hits)
-    except Exception:
-        logger.exception("сбой генерации /edit project_id=%s", project_id)
-        raise HTTPException(status_code=500, detail="внутренняя ошибка")
+    summary, edits, dropped = await _generate(project_id, instruction, context_hits)
 
     if not edits:
         return _cannot()

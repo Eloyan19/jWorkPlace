@@ -9,8 +9,17 @@ vi.mock('../api')
 
 const mockedApi = vi.mocked(api)
 
-function readyProject(): Project {
-  return { id: 'abc123', url: 'u', name: 'repo', status: 'ready', error: null, indexed_at: null }
+function readyProject(overrides: Partial<Project> = {}): Project {
+  return {
+    id: 'abc123',
+    url: 'u',
+    name: 'repo',
+    status: 'ready',
+    error: null,
+    indexed_at: null,
+    can_edit: false,
+    ...overrides,
+  }
 }
 
 function okEditResponse(): EditResponse {
@@ -58,7 +67,7 @@ describe('EditPanel', () => {
     await waitFor(() => expect(screen.getByText(/ещё индексируется/i)).toBeInTheDocument())
   })
 
-  it('рендерит diff с подсветкой и disabled-кнопку PR', async () => {
+  it('рендерит diff с подсветкой и подсказку про токен вместо PR-кнопки при can_edit=false', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())
     mockedApi.proposeEdit.mockResolvedValue(okEditResponse())
@@ -87,9 +96,74 @@ describe('EditPanel', () => {
 
     expect(screen.getByText('src/util.py::foo::L1-3')).toBeInTheDocument()
 
-    const prButton = screen.getByRole('button', { name: /Подтвердить и открыть PR/i })
-    expect(prButton).toBeDisabled()
-    expect(prButton).toHaveAttribute('title', 'появится на Этапе 3b')
+    expect(screen.queryByRole('button', { name: /Подтвердить и открыть PR/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/включите правки токеном проекта/i)).toBeInTheDocument()
+  })
+
+  it('кнопка PR активна при can_edit=true и открывает PR по клику', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject({ can_edit: true }))
+    mockedApi.proposeEdit.mockResolvedValue(okEditResponse())
+    mockedApi.createPr.mockResolvedValue({
+      status: 200,
+      ok: true,
+      pr_url: 'https://github.com/owner/repo/pull/7',
+    })
+
+    render(<EditPanel />)
+    await waitFor(() => expect(screen.getByLabelText(/описание правки/i)).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/описание правки/i), {
+      target: { value: 'добавь проверку пустой строки в foo' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Предложить правку/i }))
+
+    const prButton = await screen.findByRole('button', { name: /Подтвердить и открыть PR/i })
+    expect(prButton).not.toBeDisabled()
+
+    fireEvent.click(prButton)
+
+    const expectedDiff = okEditResponse()
+    if (!expectedDiff.ok) throw new Error('unreachable: okEditResponse is always ok:true')
+    await waitFor(() => {
+      expect(mockedApi.createPr).toHaveBeenCalledWith('abc123', {
+        instruction: 'добавь проверку пустой строки в foo',
+        expected_diff: expectedDiff.diff,
+      })
+    })
+
+    const link = await screen.findByRole('link', { name: /https:\/\/github\.com\/owner\/repo\/pull\/7/i })
+    expect(link).toHaveAttribute('href', 'https://github.com/owner/repo/pull/7')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('409 от /pr показывает «превью устарело» и не даёт повторный клик', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject({ can_edit: true }))
+    mockedApi.proposeEdit.mockResolvedValue(okEditResponse())
+    mockedApi.createPr.mockResolvedValue({
+      status: 409,
+      ok: false,
+      reason: 'превью устарело, обновите',
+    })
+
+    render(<EditPanel />)
+    await waitFor(() => expect(screen.getByLabelText(/описание правки/i)).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/описание правки/i), {
+      target: { value: 'добавь проверку пустой строки в foo' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Предложить правку/i }))
+
+    const prButton = await screen.findByRole('button', { name: /Подтвердить и открыть PR/i })
+    fireEvent.click(prButton)
+
+    await waitFor(() => {
+      expect(screen.getByText(/превью устарело — сгенерируйте правку заново/i)).toBeInTheDocument()
+    })
+    expect(mockedApi.createPr).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /Подтвердить и открыть PR/i })).not.toBeInTheDocument()
   })
 
   it('показывает «не могу выполнить правку» при ok:false', async () => {
