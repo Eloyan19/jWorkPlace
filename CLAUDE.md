@@ -27,11 +27,24 @@
 > nginx `= /api/chat` (Bearer, timeout 180s). Прошли llm-engineer + security-auditor (аудит чист) +
 > `/code-review`. **Baseline grounded-точности:** cases 5/5 = 1.00 валидных line-based цитат, negatives
 > 4/4 abstain. 88 pytest + 18 vitest.
+> **Этап 3a (правка → предпросмотр diff, БЕЗ PR):** `chat/grounding.py` (вынесены `safe_repo_path` +
+> `read_span` — общий traversal-guard), `edit/patcher.py` (`EDIT_SYSTEM_PROMPT` anti-injection,
+> `build_edit_context` окна символов в нонс-делимитерах+redact, `parse_and_validate_edits` —
+> структурированные JSON-edits вместо unified diff от LLM: `file`∈hits, запрет `.git/`/`.github/workflows/`,
+> `old_block` УНИКАЛЕН+дословен в redacted-проекции файла, дедуп; `assemble_diff` — difflib+redact;
+> `check_apply` — `git apply --check` hardening-env), `api/edit.py` (`POST /api/projects/{id}/edit`:
+> retrieve→гейт should_abstain→генерация temp=0→валидация→сборка diff→--check; fail-closed `{ok:false}`;
+> instruction max_length=2000), фронт `EditPanel` (подсветка diff +/−, источники, заглушка кнопки PR
+> «Этап 3b»), nginx `~ ^/api/projects/[^/]+/edit$` (Bearer, timeout 180s), `eval/pr_quality.py`. Прошли
+> security-auditor + llm-engineer (Plan Mode-гейт) + `/code-review`. 102 pytest + 24 vitest.
+> **Прод живой (deploy cc52e55):** попросил правку → diff с источником `file::symbol::строки`,
+> `git apply --check` прошёл; off-topic → «не могу выполнить» без генерации; ключ не в логах.
 > **Прод живой:** вставил ссылку → `ready`; спросил по коду → grounded-ответ с источниками
 > `file::symbol::строки` + дословный quote; off-topic → «не знаю» без генерации. Секреты гейтятся до
 > эмбеддинга (fail-closed на gitleaks) и маскируются `redact` до LLM/клиента.
-> **Следующий шаг — Этап 3** из `PLAN.md` (правки + Pull Request: fine-grained PAT, предпросмотр diff,
-> `git apply --check`, human-in-the-loop подтверждение, PR через `gh`).
+> **Следующий шаг — Этап 3b** из `PLAN.md` (реальный PR: fine-grained PAT в env, writable-клон, ветка
+> `jworkplace/<feature>`, push, PR через `gh`, human-in-the-loop confirm — требует PAT пользователя +
+> его тестовый репо).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
 
 ---

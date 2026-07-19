@@ -251,6 +251,23 @@ line-based валидацией; гейт «не знаю»; UI чата с ис
 создаёт реальный Pull Request из feature-ветки. Прямой push в `main` запрещён. Пока **без роя** —
 одиночная генерация патча (рой придёт на Этапе 4, переиспользуя этот PR-механизм).
 
+**Под-релизы (деплоим по отдельности):**
+- **3a ✅ ВЫПОЛНЕНО 2026-07-19 (коммит `cc52e55`)** — правка → предпросмотр diff БЕЗ PR (полностью без
+  GitHub-доступа, поверх индекс-клона). `chat/grounding.py` (вынесены `safe_repo_path`+`read_span`),
+  `edit/patcher.py` (структурированные JSON-edits вместо unified diff от LLM — DeepSeek врёт в
+  `@@`-хедерах; `old_block` УНИКАЛЕН+дословен в redacted-проекции файла, запрет `.git/`/`.github/workflows/`,
+  дедуп; `assemble_diff` через difflib; `check_apply` = `git apply --check`), `api/edit.py`
+  (`POST /api/projects/{id}/edit`: retrieve→гейт→генерация temp=0→валидация→--check; fail-closed),
+  фронт `EditPanel` (подсветка diff, источники, заглушка кнопки PR), nginx `~ .../edit$` (timeout 180s),
+  `eval/pr_quality.py`. Прошли security-auditor + llm-engineer + `/code-review` (5 находок, значимые
+  исправлены). 102 pytest + 24 vitest. **Прод живой:** правка → diff с источником, `git apply --check`
+  прошёл; off-topic → «не могу»; ключ не в логах.
+- **3b — реальный PR:** fine-grained PAT в env, writable-клон в `$JWP_DATA_DIR/worktrees/<pid>/` (токен
+  только через env-`http.extraHeader`, не в URL/argv), ветка `jworkplace/<feature>`, `commit --no-verify`
+  → push → PR через `gh`; `POST /api/projects/{id}/pr {confirm}` (human-in-the-loop). Требует действия
+  пользователя: PAT (`contents:write`+`pull_requests:write`) на его тестовый репо. Повторный аудит
+  security-auditor. Кнопка «Подтвердить и открыть PR» активируется.
+
 **Задачи.**
 - `security-auditor` (эксперт ПЕРВЫМ) — GitHub-доступ: **fine-grained PAT** с минимальным scope
   (`contents` + `pull_requests`), в env, не в git/лог даже частично; политика веток (только
