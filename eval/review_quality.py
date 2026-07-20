@@ -205,32 +205,40 @@ async def main(golden_file: str, dry_run: bool = False) -> int:
 
     results = {"seeded_bugs": [], "injections": []}
 
-    logger.info("\n=== Засеянные баги ===")
-    for pr in golden.get("seeded_bugs", []):
-        found, msg = await _test_seeded_bugs(project_id, pr, dry_run)
-        results["seeded_bugs"].append({"type": pr.get("seeded_bug_type"), "found": found, "msg": msg})
-        logger.info(f"  {msg}")
+    try:
+        logger.info("\n=== Засеянные баги ===")
+        for pr in golden.get("seeded_bugs", []):
+            found, msg = await _test_seeded_bugs(project_id, pr, dry_run)
+            results["seeded_bugs"].append({"type": pr.get("seeded_bug_type"), "found": found, "msg": msg})
+            logger.info(f"  {msg}")
 
-    logger.info("\n=== Injection-устойчивость ===")
-    for pr in golden.get("injections", []):
-        safe, msg = await _test_injection_resistance(project_id, pr, dry_run)
-        results["injections"].append({"type": pr.get("injection_type"), "safe": safe, "msg": msg})
-        logger.info(f"  {msg}")
+        logger.info("\n=== Injection-устойчивость ===")
+        for pr in golden.get("injections", []):
+            safe, msg = await _test_injection_resistance(project_id, pr, dry_run)
+            results["injections"].append({"type": pr.get("injection_type"), "safe": safe, "msg": msg})
+            logger.info(f"  {msg}")
 
-    # Метрики
-    seeded_found = sum(1 for r in results["seeded_bugs"] if r["found"])
-    seeded_total = len(results["seeded_bugs"])
-    seeded_recall = seeded_found / seeded_total if seeded_total else 0
+        # Метрики
+        seeded_found = sum(1 for r in results["seeded_bugs"] if r["found"])
+        seeded_total = len(results["seeded_bugs"])
+        seeded_recall = seeded_found / seeded_total if seeded_total else 0
 
-    injections_safe = sum(1 for r in results["injections"] if r["safe"])
-    injections_total = len(results["injections"])
-    injections_safe_rate = injections_safe / injections_total if injections_total else 0
+        injections_safe = sum(1 for r in results["injections"] if r["safe"])
+        injections_total = len(results["injections"])
+        injections_safe_rate = injections_safe / injections_total if injections_total else 0
 
-    logger.info("\n=== Метрики ===")
-    logger.info(f"Recall засеянных багов: {seeded_found}/{seeded_total} = {seeded_recall:.2%}")
-    logger.info(f"Injection-safety: {injections_safe}/{injections_total} = {injections_safe_rate:.2%}")
+        logger.info("\n=== Метрики ===")
+        logger.info(f"Recall засеянных багов: {seeded_found}/{seeded_total} = {seeded_recall:.2%}")
+        logger.info(f"Injection-safety: {injections_safe}/{injections_total} = {injections_safe_rate:.2%}")
 
-    return 0
+        return 0
+    finally:
+        # Всегда убираем за собой временный eval-проект — иначе он оседает в БД (в т.ч. прод, если
+        # запустить без изолированного JWP_DATA_DIR) и не удаляется через UI: его id `eval-review-*`
+        # не проходит гвард `_SAFE_PROJECT_ID` эндпоинта DELETE (регресс, чинившийся вручную).
+        # FTS/FAISS у eval-проекта нет — достаточно снять строки projects/files/chunks.
+        db.delete_project(project_id)
+        logger.info("eval-проект очищен: %s", project_id)
 
 
 if __name__ == "__main__":
