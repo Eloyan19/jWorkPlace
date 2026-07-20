@@ -75,6 +75,10 @@
 > тестовый PR #1 → Action → AI-комментарий с реальными багами + ссылками на RAG-контекст проекта.
 > Урок CI: `gh pr diff/view/comment` без `actions/checkout` → нужен `--repo "$REPO"` (иначе «not a git
 > repository»). Секреты репо заданы. Запушено в origin (`workflow` scope добавлен в gh).
+> **Доработка (deploy `c80bc70`): управление репо** — у `ready`-проекта в UI три действия: Обновить
+> (инкрементальный `/reindex`), Переиндексировать заново (`POST /{id}/rebuild` → `clone_repo` с нуля),
+> Удалить (`DELETE /{id}` → чистит БД/FTS/FAISS/клоны; `embed_cache` глобальный не трогаем;
+> `_safe_project_dir` guard + `_pr_in_flight` gate). 200 pytest + 39 vitest.
 > **Следующий шаг — Этап 4** из `PLAN.md` (рой агентов Слоя B на DeepSeek function-calling: analyzer →
 > planner/critic → coder → reviewer → judge → PR; переиспользует hybrid search Этапа 2 и PR-флоу 3b).
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
