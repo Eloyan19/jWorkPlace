@@ -839,87 +839,139 @@ body {
   margin: 0.75rem 0 0.5rem;
 }
 
-.structure-files {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.structure-tools {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 26rem;
-  overflow-y: auto;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0.75rem 0 0.5rem;
+  flex-wrap: wrap;
 }
 
-.structure-file {
-  border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.04);
+.structure-tools .structure-summary {
+  margin: 0;
+}
+
+.structure-toggle-all {
+  background: none;
+  border: none;
+  color: #2f6fed;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.structure-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+  max-height: 30rem;
+  overflow: auto;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 0.5rem 0.7rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 @media (prefers-color-scheme: dark) {
-  .structure-file {
-    background: rgba(255, 255, 255, 0.05);
+  .structure-tree {
     border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
   }
 }
 
-.structure-file-header {
+.tree-item {
+  list-style: none;
+}
+
+.tree-children,
+.tree-symbols {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.structure-file-path {
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
-  font-weight: 600;
-  font-size: 0.85rem;
-  word-break: break-all;
+.tree-row:hover {
+  background: rgba(47, 111, 237, 0.09);
 }
 
-.structure-file-lang {
-  font-size: 0.72rem;
+.tree-caret {
+  flex: none;
+  width: 0.85rem;
+  font-size: 0.65rem;
   opacity: 0.6;
 }
 
-.structure-file-excluded {
-  font-size: 0.72rem;
+.tree-icon {
+  flex: none;
+  font-size: 0.85rem;
+}
+
+.tree-name {
+  font-size: 0.85rem;
+}
+
+.tree-dir .tree-name {
+  font-weight: 600;
+}
+
+.tree-file .tree-name {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+
+.tree-lang {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.tree-count {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.tree-excluded {
+  font-size: 0.7rem;
   color: #e67e22;
 }
 
-.structure-symbols {
-  list-style: none;
-  margin: 0.4rem 0 0;
-  padding: 0 0 0 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.structure-symbol {
+.tree-symbol {
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  padding: 0.12rem 0.6rem;
 }
 
-.structure-symbol-kind {
-  opacity: 0.55;
-  font-size: 0.72rem;
-  min-width: 4.5rem;
+.tree-symbol-kind {
+  flex: none;
+  opacity: 0.5;
+  font-size: 0.68rem;
+  min-width: 5rem;
 }
 
-.structure-symbol-name {
+.tree-symbol-name {
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
   word-break: break-all;
 }
 
-.structure-symbol-lines {
-  opacity: 0.5;
-  font-size: 0.72rem;
-  white-space: nowrap;
+.tree-symbol-lines {
   margin-left: auto;
+  opacity: 0.45;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 /* --- Вкладки (раскладка панелей) --- */

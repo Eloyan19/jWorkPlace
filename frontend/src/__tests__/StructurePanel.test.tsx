@@ -42,7 +42,7 @@ describe('StructurePanel', () => {
     expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
   })
 
-  it('по кнопке грузит и рендерит дерево файлов и символов', async () => {
+  it('по кнопке грузит дерево: папка и файл видны, символы — по клику', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())
     mockedApi.getStructure.mockResolvedValue(structure())
@@ -52,10 +52,16 @@ describe('StructurePanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Показать структуру/i }))
 
-    await waitFor(() => expect(screen.getByText('src/util.py')).toBeInTheDocument())
-    expect(screen.getByText('foo')).toBeInTheDocument()
-    expect(screen.getByText('Bar')).toBeInTheDocument()
+    // Дерево: папка `src` раскрыта по умолчанию, файл `util.py` виден, символы скрыты.
+    await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
+    expect(screen.getByText('util.py')).toBeInTheDocument()
     expect(screen.getByText(/1 файлов · 2 символов/i)).toBeInTheDocument()
+    expect(screen.queryByText('foo')).not.toBeInTheDocument()
+
+    // Клик по файлу раскрывает его символы.
+    fireEvent.click(screen.getByText('util.py'))
+    await waitFor(() => expect(screen.getByText('foo')).toBeInTheDocument())
+    expect(screen.getByText('Bar')).toBeInTheDocument()
     expect(mockedApi.getStructure).toHaveBeenCalledWith('abc123')
   })
 
