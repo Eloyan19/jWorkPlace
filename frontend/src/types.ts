@@ -93,6 +93,72 @@ export type EditResponse =
       reason: string
     }
 
+// Структура проекта (Задание 1): детерминированный вывод индекса (files + символы из chunks),
+// БЕЗ LLM/RAG. Источник — БД, поэтому список консистентен с тем, что «видит» ассистент.
+export interface SymbolInfo {
+  symbol: string
+  kind: string | null
+  start_line: number
+  end_line: number
+}
+
+export interface FileNode {
+  path: string
+  lang: string | null
+  size: number | null
+  excluded: boolean
+  symbols: SymbolInfo[]
+}
+
+export interface ProjectStructure {
+  project_id: string
+  name: string
+  file_count: number
+  symbol_count: number
+  files: FileNode[]
+}
+
+// Ассистент поддержки (Задание 2): ответ по FAQ продукта с опциональным контекстом тикета (MCP).
+// escalate=true — в документации ответа нет, обращение уходит человеку. ticket_applied — был ли
+// учтён контекст тикета (сам тикет клиенту не возвращаем).
+export interface SupportSource {
+  file: string
+  section: string
+  citation: string
+  quote: string
+}
+
+export interface SupportResponse {
+  answer: string
+  escalate: boolean
+  sources: SupportSource[]
+  ticket_applied: boolean
+}
+
+// Файловый tool-агент (Задание 3): агент сам комбинирует чтение/поиск/правки под цель.
+// needs_pr=false — задача только на чтение (result_text, без PR). needs_pr=true — есть применимый
+// diff и run_id: сервер держит diff у себя, подтверждаем по run_id (не шлём diff обратно).
+export interface AgentSource {
+  file: string
+  reason: string
+  citation: string
+}
+
+export interface AgentRunResponse {
+  ok: boolean
+  needs_pr: boolean
+  run_id?: string
+  can_edit?: boolean
+  diff?: string
+  result_text: string
+  sources: AgentSource[]
+}
+
+export type AgentPrResult = { status: number } & (
+  | { ok: true; pr_url: string }
+  | { ok: false; reason: string }
+)
+
 // Реальный PR (Этап 3b). Сервер регенерирует diff и сверяет с показанным пользователю —
 // расхождение (проект переиндексирован/файлы изменились между предпросмотром и подтверждением)
 // возвращается как ok:false с reason (HTTP 409, см. api.ts::createPr).

@@ -5,6 +5,19 @@ import type { ChatMessage, ChatSource, Project } from '../types'
 
 const POLL_INTERVAL_MS = 2_000
 
+// Команда /help (Задание 1): статический ответ о возможностях ассистента. Обрабатывается
+// на фронте и НЕ уходит на backend — это мета-вопрос о продукте, а не о коде проекта; через
+// grounded-чат он бы упёрся в гейт «не знаю» (в индексе чужого репо нет чанка про jWorkPlace).
+const HELP_COMMAND = '/help'
+const HELP_TEXT = [
+  'Я — ассистент по этому проекту. Что умею:',
+  '• отвечать на вопросы по коду («что делает проект», «что делает класс X», «где вызывается Y») — grounded, с цитатами по строкам файла;',
+  '• показать структуру проекта — панель «Структура проекта» ниже (дерево файлов + символы из индекса);',
+  '• предложить правку по коду и открыть Pull Request — панель «Правка».',
+  '',
+  'Просто задайте вопрос в этом чате. Ответы обоснованы кодом; если релевантного фрагмента нет — честно отвечу «не знаю».',
+].join('\n')
+
 // Сообщение для отображения в ленте: несёт доп. поля источников/abstain, которых нет в
 // «сыром» ChatMessage (тот уходит на backend без них — см. handleSend).
 interface DisplayMessage extends ChatMessage {
@@ -71,6 +84,20 @@ function ChatPanel() {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed || !activeId) return
+
+    // /help — статический ответ на фронте, без обращения к backend (см. HELP_TEXT).
+    if (trimmed.toLowerCase() === HELP_COMMAND) {
+      setMessages((prev) =>
+        prev.concat(
+          { role: 'user', content: trimmed },
+          { role: 'assistant', content: HELP_TEXT },
+        ),
+      )
+      setInput('')
+      setError(null)
+      return
+    }
+
     const sentId = activeId
     const userMsg: DisplayMessage = { role: 'user', content: trimmed }
     const history = messages.concat(userMsg)
@@ -131,7 +158,7 @@ function ChatPanel() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="что делает проект, где вызывается Y…"
+              placeholder="что делает проект, где вызывается Y… (/help — возможности)"
               aria-label="вопрос по коду проекта"
               disabled={sending}
             />

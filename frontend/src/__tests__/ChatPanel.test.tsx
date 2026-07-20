@@ -104,6 +104,21 @@ describe('ChatPanel', () => {
     expect(screen.queryByText(/::L/)).not.toBeInTheDocument()
   })
 
+  it('/help отвечает статически, не вызывая backend', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject())
+
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByLabelText(/вопрос по коду/i)).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/вопрос по коду/i), { target: { value: '/help' } })
+    fireEvent.click(screen.getByRole('button', { name: /Спросить/i }))
+
+    await waitFor(() => expect(screen.getByText(/Я — ассистент по этому проекту/i)).toBeInTheDocument())
+    expect(screen.getByText(/показать структуру проекта/i)).toBeInTheDocument()
+    expect(mockedApi.sendChat).not.toHaveBeenCalled()
+  })
+
   it('показывает ошибку при сбое чата', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())

@@ -46,15 +46,40 @@ class DeepSeekLlmService(LlmService):
         if not self._api_key:
             raise LlmError("DEEPSEEK_API_KEY не задан")
 
-        content, finish_reason = await self._request(messages, response_format, temperature, max_tokens)
+        message, finish_reason = await self._request(messages, response_format, temperature, max_tokens)
         if finish_reason == "length":
             # Обрезанный ответ (обычно ломает JSON) — один retry с бОльшим бюджетом токенов.
-            content, finish_reason = await self._request(
+            message, finish_reason = await self._request(
                 messages, response_format, temperature, max_tokens * 2
             )
             if finish_reason == "length":
                 raise LlmError("ответ DeepSeek обрезан по длине дважды подряд")
-        return content
+        return message.get("content") or ""
+
+    async def chat_raw(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict = "auto",
+        temperature: float = 0.0,
+        max_tokens: int = 1024,
+    ) -> dict:
+        if not self._api_key:
+            raise LlmError("DEEPSEEK_API_KEY не задан")
+
+        message, finish_reason = await self._request(
+            messages, None, temperature, max_tokens, tools=tools, tool_choice=tool_choice
+        )
+        if finish_reason == "length":
+            message, finish_reason = await self._request(
+                messages, None, temperature, max_tokens * 2, tools=tools, tool_choice=tool_choice
+            )
+        return {
+            "content": message.get("content"),
+            "tool_calls": message.get("tool_calls"),
+            "finish_reason": finish_reason,
+        }
 
     async def complete(self, prompt: str) -> str:
         return await self.chat([{"role": "user", "content": prompt}])
@@ -65,14 +90,22 @@ class DeepSeekLlmService(LlmService):
         response_format: dict | None,
         temperature: float,
         max_tokens: int,
-    ) -> tuple[str, str | None]:
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict = "auto",
+    ) -> tuple[dict, str | None]:
         payload: dict = {
             "model": DEEPSEEK_MODEL,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        if response_format is not None:
+        # tools и response_format взаимоисключающи: при function-calling структуру задаёт схема
+        # инструмента, json_object конфликтует (см. base.chat_raw).
+        if tools is not None:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice
+        elif response_format is not None:
             payload["response_format"] = response_format
 
         try:
@@ -98,11 +131,11 @@ class DeepSeekLlmService(LlmService):
 
         try:
             choice = data["choices"][0]
-            content = choice["message"]["content"]
+            message = choice["message"]
             finish_reason = choice.get("finish_reason")
         except (KeyError, IndexError, TypeError):
             raise LlmError("DeepSeek API вернул неожиданный формат ответа") from None
-        return content, finish_reason
+        return message, finish_reason
 
 
 def get_llm(settings: Settings) -> LlmService:

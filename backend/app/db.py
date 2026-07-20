@@ -242,6 +242,48 @@ def mark_files_indexed(project_id: str, paths: list[str]) -> None:
         )
 
 
+def project_tree(project_id: str) -> list[dict]:
+    """Дерево проекта для вывода структуры (Задание 1): индексируемые файлы + их символы.
+
+    Источник — БД (files+chunks), НЕ обход клона: консистентно с индексом, без I/O и гонок с
+    `blob:none`/rebuild. Бинарные/vendored файлы отсекаем (это шум, не «код, который видит ассистент»);
+    excluded (находки gitleaks) оставляем, но помечаем флагом — файл в дереве есть, содержимого нет.
+    """
+    with get_conn() as conn:
+        files = conn.execute(
+            "SELECT path, lang, size, excluded FROM files "
+            "WHERE project_id = ? AND is_binary = 0 AND is_vendored = 0 "
+            "ORDER BY path",
+            (project_id,),
+        ).fetchall()
+        chunks = conn.execute(
+            "SELECT file, symbol, symbol_kind, start_line, end_line FROM chunks "
+            "WHERE project_id = ? AND symbol IS NOT NULL "
+            "ORDER BY file, start_line",
+            (project_id,),
+        ).fetchall()
+    symbols_by_file: dict[str, list[dict]] = {}
+    for c in chunks:
+        symbols_by_file.setdefault(c["file"], []).append(
+            {
+                "symbol": c["symbol"],
+                "kind": c["symbol_kind"],
+                "start_line": c["start_line"],
+                "end_line": c["end_line"],
+            }
+        )
+    return [
+        {
+            "path": f["path"],
+            "lang": f["lang"],
+            "size": f["size"],
+            "excluded": bool(f["excluded"]),
+            "symbols": symbols_by_file.get(f["path"], []),
+        }
+        for f in files
+    ]
+
+
 # --- chunks ---
 
 def delete_chunks(project_id: str) -> None:

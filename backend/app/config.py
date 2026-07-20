@@ -70,6 +70,11 @@ class Settings(BaseSettings):
         """Писабельные клоны для PR-флоу (Этап 3b) — отдельно от read-only repos_dir."""
         return self.data_dir / "worktrees"
 
+    @property
+    def support_dir(self) -> Path:
+        """Данные ассистента поддержки (Задание 2): FAQ-индекс + JSON тикетов/юзеров для MCP."""
+        return self.data_dir / "support"
+
 
 @lru_cache
 def get_settings() -> Settings:

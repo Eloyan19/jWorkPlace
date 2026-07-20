@@ -5,12 +5,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db
+from app.api.agent import router as agent_router
 from app.api.chat import router as chat_router
 from app.api.edit import router as edit_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
 from app.api.review import router as review_router
 from app.api.search import router as search_router
+from app.api.structure import router as structure_router
+from app.api.support import router as support_router
 from app.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +51,9 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(edit_router)
     app.include_router(review_router)
+    app.include_router(structure_router)
+    app.include_router(support_router)
+    app.include_router(agent_router)
     return app
 
 

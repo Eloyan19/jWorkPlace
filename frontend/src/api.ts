@@ -1,11 +1,15 @@
 import type {
+  AgentPrResult,
+  AgentRunResponse,
   ChatMessage,
   ChatResponse,
   EditResponse,
   Health,
   PrResponse,
   Project,
+  ProjectStructure,
   SearchResponse,
+  SupportResponse,
 } from './types'
 
 // Инвариант: только относительный путь. В dev его проксирует Vite (vite.config.ts ->
@@ -145,6 +149,15 @@ export async function deleteProjectToken(id: string): Promise<{ can_edit: boolea
   return (await res.json()) as { can_edit: boolean }
 }
 
+// Структура проекта (Задание 1): дерево файлов + символы из индекса. Read-only, без LLM.
+export async function getStructure(id: string): Promise<ProjectStructure> {
+  const res = await fetch(`/api/projects/${id}/structure`, { headers: authHeaders() })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as ProjectStructure
+}
+
 export async function searchCode(
   projectId: string,
   query: string,
@@ -159,6 +172,53 @@ export async function searchCode(
     throw new Error(await readErrorMessage(res))
   }
   return (await res.json()) as SearchResponse
+}
+
+// Ассистент поддержки (Задание 2): вопрос о продукте + опциональный ticket_id (контекст из MCP).
+export async function askSupport(
+  question: string,
+  ticketId?: string,
+): Promise<SupportResponse> {
+  const res = await fetch('/api/support/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ question, ticket_id: ticketId?.trim() || undefined }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as SupportResponse
+}
+
+// Файловый tool-агент (Задание 3): запустить агента по цели → превью (result_text или diff+run_id).
+export async function runAgent(projectId: string, goal: string): Promise<AgentRunResponse> {
+  const res = await fetch(`/api/projects/${projectId}/agent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ goal }),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as AgentRunResponse
+}
+
+// Подтвердить и открыть PR по сохранённому прогону (run_id). 409 (превью устарело) — не транспортная
+// ошибка: разбираем наравне с 200, как createPr.
+export async function confirmAgentPr(projectId: string, runId: string): Promise<AgentPrResult> {
+  const res = await fetch(`/api/projects/${projectId}/agent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ confirm: true, run_id: runId }),
+  })
+  if (!res.ok && res.status !== 409 && res.status !== 403) {
+    throw new Error(await readErrorMessage(res))
+  }
+  const data = (await res.json()) as { ok: boolean; pr_url?: string; reason?: string; detail?: string }
+  return {
+    status: res.status,
+    ...(data.ok ? { ok: true, pr_url: data.pr_url ?? '' } : { ok: false, reason: data.reason ?? data.detail ?? 'не удалось открыть PR' }),
+  } as AgentPrResult
 }
 
 export async function sendChat(

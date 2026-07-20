@@ -79,9 +79,28 @@
 > (инкрементальный `/reindex`), Переиндексировать заново (`POST /{id}/rebuild` → `clone_repo` с нуля),
 > Удалить (`DELETE /{id}` → чистит БД/FTS/FAISS/клоны; `embed_cache` глобальный не трогаем;
 > `_safe_project_dir` guard + `_pr_in_flight` gate). 200 pytest + 39 vitest.
-> **Этап 4 (рой агентов Слоя B) — ⏸ ОТЛОЖЕН (решение пользователя 2026-07-20).** MVP 0–3 + доработки
-> живут на проде; сейчас проходимся по нюансам/доработкам текущего продукта, рой — позже. Дизайн роя
-> (analyzer → planner/critic → coder → reviewer → judge → PR) сохранён в `PLAN.md`/`## Слой B`.
+> **Учебные задания 1–3 (MVP поверх фундамента, не задеплоено):**
+> **Зад.1 (`/help` + структура):** `db.project_tree` (дерево files+символы из chunks, БЕЗ LLM/обхода
+> клона), `api/structure.py` (`GET /api/projects/{id}/structure`), фронт `StructurePanel` + команда
+> `/help` в чате (статический ответ на фронте, В ОБХОД abstain-гейта — мета-вопрос о продукте).
+> **Зад.2 (поддержка + РЕАЛЬНЫЙ MCP):** `support/corpus.py` (FAQ-корпус `docs/faq.md` → отдельный
+> мини-FAISS `__support__`, БЕЗ per-project пайплайна), `support/qa.py` (grounded по FAQ через
+> `chat/grounding`, тикет из MCP — недоверенные данные в делимитерах+`redact`, гейт эскалации,
+> retrieve в to_thread), `mcp_servers/tickets_server.py` (FastMCP **stdio** read-only
+> `get_ticket`/`list_tickets(user_id обязателен)`/`get_user` над JSON), `support/mcp_client.py`
+> (backend как MCP-клиент, allowlist id, semaphore≤2, fail-closed), `api/support.py`
+> (`POST /api/support/ask`), фронт вкладка `SupportPanel`. Прошёл security-auditor (критичных нет).
+> **Зад.3 (файловый tool-агент = MVP Слоя B, ОДИН агент):** `llm/base.py`+`deepseek.py` (`chat_raw`
+> function-calling: tools/tool_choice, возврат {content,tool_calls,finish_reason}), `agent/tools.py`
+> (schemas + исполнители search_code/read_file/list_files/propose_patch/write_file[только новые .md]/
+> finish; guard'ы на каждый вход, `redact` каждого результата), `agent/loop.py` (tool-loop ≤8 итер,
+> дедуп, fail-closed), `patcher.new_file_diff`/`assemble_full_diff` (новые файлы в общий diff),
+> `api/agent.py` (`POST /api/projects/{id}/agent`: прогон → превью; confirm по `run_id` +
+> перепроверка `check_apply` → `open_pr`, паттерн /pr), фронт `AgentPanel`. Эксперты llm+security
+> ПЕРВЫМИ. **233 pytest + 51 vitest.**
+> **Этап 4 (мультиролевой рой Слоя B) — ⏸ ОТЛОЖЕН (решение 2026-07-20).** Одиночный tool-агент
+> (Зад.3) — это MVP-вход в Слой B; мультиролевой рой (planner/critic/coder/reviewer/judge)
+> надстраивается позже над тем же `agent/tools.py`. Дизайн роя сохранён в `PLAN.md`/`## Слой B`.
 > Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
 
 ---

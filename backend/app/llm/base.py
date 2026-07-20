@@ -26,6 +26,26 @@ class LlmService(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def chat_raw(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict = "auto",
+        temperature: float = 0.0,
+        max_tokens: int = 1024,
+    ) -> dict:
+        """Function-calling вызов для tool-loop (Задание 3). Возвращает СЫРОЙ ассистентский message:
+        {"content": str|None, "tool_calls": list|None, "finish_reason": str|None}.
+
+        `tools` — список OpenAI-совместимых схем инструментов; `tool_choice` — "auto"/"none"/{...}.
+        Важно: при переданных `tools` НЕ передаём `response_format` (структуру задаёт схема
+        инструмента, json_object конфликтует с function-calling). `content` пуст, когда модель
+        решила вызвать инструмент (finish_reason="tool_calls").
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def complete(self, prompt: str) -> str:
         """Одиночный promt-комплишн -> текст ответа."""
         raise NotImplementedError

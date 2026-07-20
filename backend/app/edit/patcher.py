@@ -187,6 +187,44 @@ def assemble_diff(edits: list[dict], project_id: str) -> str:
     return redact("".join(chunks))
 
 
+def new_file_diff(file: str, content: str) -> str:
+    """Unified diff, создающий НОВЫЙ файл `file` с содержимым `content` (Задание 3, write_file).
+
+    Формат git-apply-совместимый (`diff --git` + `new file mode` + `/dev/null` → `b/file`).
+    Содержимое прогоняем через redact (второй барьер секретов). Пустой content → "".
+    """
+    text = redact(content)
+    if not text:
+        return ""
+    if not text.endswith("\n"):
+        text += "\n"
+    lines = text.splitlines(keepends=True)
+    body = "".join(f"+{ln}" for ln in lines)
+    header = (
+        f"diff --git a/{file} b/{file}\n"
+        f"new file mode 100644\n"
+        f"--- /dev/null\n"
+        f"+++ b/{file}\n"
+        f"@@ -0,0 +1,{len(lines)} @@\n"
+    )
+    return header + body
+
+
+def assemble_full_diff(project_id: str, edits: list[dict], writes: list[dict]) -> str:
+    """Единый diff файлового агента (Задание 3): правки существующих файлов (`assemble_diff`) +
+    новые файлы (`new_file_diff`), сконкатенированные. `writes` — [{path, content}]. Оба источника
+    уже redacted. Пустой результат → "" (нечего применять → check_apply вернёт False)."""
+    parts: list[str] = []
+    edit_diff = assemble_diff(edits, project_id)
+    if edit_diff.strip():
+        parts.append(edit_diff)
+    for w in writes:
+        nd = new_file_diff(w["path"], w["content"])
+        if nd.strip():
+            parts.append(nd)
+    return "".join(parts)
+
+
 def check_apply(project_id: str, diff: str) -> bool:
     """`git -C repos/<pid> apply --check` с diff в stdin. True ⟺ патч применяется чисто.
     Пустой diff — не патч (False). Ошибки git/таймаут → False (fail-closed)."""
