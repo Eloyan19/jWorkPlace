@@ -866,15 +866,18 @@ body {
   padding: 0.35rem 0;
   max-height: 30rem;
   overflow: auto;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.02);
+  /* Контрастная карточка: раньше фон был почти прозрачным (rgba(0,0,0,0.02)) и сливался со
+     страницей (#f5f5f7) → дерево плохо читалось. Белая карточка на сером фоне явно выделяется. */
+  background: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   .structure-tree {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.14);
+    /* Панель чуть светлее тёмного фона страницы (#14161a) — даёт отделение и читаемость. */
+    background: #1c1f24;
   }
 }
 
