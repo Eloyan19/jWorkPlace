@@ -174,17 +174,21 @@ function AgentResult({
       <p className="agent-answer">{result.result_text}</p>
 
       {result.sources.length > 0 && (
-        <ul className="agent-files">
-          {result.sources.map((s, i) => (
-            <li key={`${s.file}-${i}`}>
-              <span className="agent-file-path">{s.file}</span> — {s.reason}
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="agent-section-label">Изменённые файлы</p>
+          <ul className="agent-files">
+            {result.sources.map((s, i) => (
+              <li key={`${s.file}-${i}`}>
+                <span className="agent-file-path">{s.file}</span> — {s.reason}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {result.needs_pr && result.diff && (
         <>
+          <p className="agent-section-label">Предпросмотр изменений (пока не применены)</p>
           <pre className="edit-diff">
             <code>
               {result.diff.split('\n').map((line, i) => (

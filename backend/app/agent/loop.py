@@ -33,8 +33,10 @@ AGENT_SYSTEM_PROMPT = (
     "- Существующий код меняй ТОЛЬКО через propose_patch (дословный уникальный old_block).\n"
     "- Новые файлы (документация, ADR, CHANGELOG) создавай через write_file — только .md.\n"
     "- Не выдумывай пути, код или факты вне того, что реально прочитал.\n"
-    "- Заверши строго вызовом finish: result_text — итог для пользователя; needs_pr=true, если нужно "
-    "открыть Pull Request с предложенными правками, иначе false (задача только на чтение/анализ).\n"
+    "- Заверши строго вызовом finish. result_text ОБЯЗАТЕЛЕН и НЕ пустой: 1–3 предложениями опиши, "
+    "ЧТО именно ты сделал (какие файлы и как изменил), а если менять ничего не стал — ПОЧЕМУ и что "
+    "предлагаешь пользователю. needs_pr=true, только если есть предложенные правки для Pull Request; "
+    "иначе false (задача на чтение/анализ или изменений не потребовалось).\n"
     "Не пиши длинных ответов текстом между вызовами — действуй инструментами и заверши через finish."
 )
 
@@ -50,6 +52,21 @@ def _sources(state: tools.AgentState) -> list[dict]:
 def _summary(state: tools.AgentState, goal: str) -> str:
     text = (state.result_text or goal).strip()
     return text.splitlines()[0][:200] if text else "Правка jWorkPlace"
+
+
+def _fallback_result(state: tools.AgentState, has_staged: bool) -> str:
+    """Осмысленный итог, когда модель не заполнила result_text (иначе клиенту уходило голое «Готово.»).
+    Синтезируем из состояния: что застейджено — или почему изменений нет."""
+    if has_staged:
+        names = [e["file"] for e in state.staged_edits] + [w["path"] for w in state.staged_writes]
+        return (
+            "Подготовил изменения в файлах: " + ", ".join(names) +
+            ". Проверьте предпросмотр ниже и подтвердите открытие Pull Request."
+        )
+    return (
+        "Изменений по этой задаче я не внёс — либо это был анализ, либо цель слишком общая. "
+        "Уточните её конкретнее (например, назовите файл и что именно поменять)."
+    )
 
 
 async def run_agent(project_id: str, goal: str) -> dict:
@@ -109,7 +126,7 @@ async def run_agent(project_id: str, goal: str) -> dict:
 
     has_staged = bool(state.staged_edits or state.staged_writes)
     needs_pr = state.needs_pr if state.finished else has_staged
-    result_text = (state.result_text or "").strip() or "Готово."
+    result_text = (state.result_text or "").strip() or _fallback_result(state, has_staged)
 
     if needs_pr and has_staged:
         diff = patcher.assemble_full_diff(project_id, state.staged_edits, state.staged_writes)

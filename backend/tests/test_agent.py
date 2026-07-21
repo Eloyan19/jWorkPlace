@@ -189,6 +189,33 @@ def test_agent_edit_produces_applicable_diff(data_dir, monkeypatch):
     assert patcher.check_apply(PID, body["diff"]) is True
 
 
+def test_agent_empty_result_text_fallback_no_changes(data_dir, monkeypatch):
+    """Модель завершила с пустым result_text и без правок → информативный текст, не голое «Готово.»."""
+    _ready()
+    _git_repo({"a.py": "x\n"})
+    fake = FakeLlm([_resp([_call("1", "finish", {"result_text": "", "needs_pr": False})])])
+    monkeypatch.setattr(loop, "get_llm", lambda s: fake)
+    body = _client().post(f"/api/projects/{PID}/agent", json={"goal": "сделай что-нибудь"}).json()
+    assert body["needs_pr"] is False
+    assert body["result_text"] != "Готово."
+    assert "не внёс" in body["result_text"]
+
+
+def test_agent_empty_result_text_fallback_lists_staged(data_dir, monkeypatch):
+    """Пустой result_text, но есть застейдженные правки → перечисляем изменённые файлы."""
+    _ready()
+    _git_repo({"src/util.py": "def f():\n    pass\n"})
+    fake = FakeLlm([
+        _resp([_call("1", "write_file", {"path": "CHANGELOG.md", "content": "# CL\n\n- x\n"})]),
+        _resp([_call("2", "finish", {"result_text": "", "needs_pr": True})]),
+    ])
+    monkeypatch.setattr(loop, "get_llm", lambda s: fake)
+    body = _client().post(f"/api/projects/{PID}/agent", json={"goal": "changelog"}).json()
+    assert body["needs_pr"] is True
+    assert "Подготовил изменения в файлах" in body["result_text"]
+    assert "CHANGELOG.md" in body["result_text"]
+
+
 def test_agent_empty_goal_400(data_dir):
     _ready()
     assert _client().post(f"/api/projects/{PID}/agent", json={"goal": "   "}).status_code == 400
