@@ -206,3 +206,25 @@ def test_llm_failure_returns_500_without_leaking_detail(data_dir, monkeypatch):
     assert r.status_code == 500
     assert "sk-topsecret" not in r.text
     assert r.json()["detail"] == "внутренняя ошибка"
+
+
+def test_llm_length_error_returns_graceful_not_500(data_dir, monkeypatch):
+    """Обрезка ответа по длине (LlmError) — не «внутренняя ошибка»: 200 + мягкий ответ, без 500."""
+    _project_ready()
+    hit = _fake_hit()
+    monkeypatch.setattr(chat_api.hybrid, "hybrid_search", lambda pid, q, k: [hit])
+
+    class _Trunc:
+        async def chat(self, *a, **k):
+            raise chat_api.LlmError("ответ DeepSeek обрезан по длине дважды подряд")
+
+    monkeypatch.setattr(chat_api, "get_llm", lambda settings: _Trunc())
+
+    r = _client().post(
+        "/api/chat", json={"project_id": PID, "messages": [{"role": "user", "content": "что делает проект"}]}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["abstain"] is True
+    assert body["sources"] == []
+    assert body["answer"] == chat_api.GENERATION_FAILED_REPLY

@@ -15,7 +15,7 @@ from app import db
 from app.chat import grounding
 from app.config import get_settings
 from app.indexing import hybrid
-from app.llm.deepseek import get_llm
+from app.llm.deepseek import LlmError, get_llm
 
 logger = logging.getLogger("jworkplace.chat")
 
@@ -24,8 +24,15 @@ router = APIRouter(prefix="/api/chat")
 _K = 8              # кандидатов от hybrid_search
 _CONTEXT_N = 6       # из них — в промпт (экономия контекста)
 _MAX_HISTORY = 12    # потолок ходов диалога в промпт (стоимость/латентность; takeLast)
+# Потолок токенов ответа. Grounded-ответ несёт дословные цитаты кода — на широких вопросах
+# («что делает проект») дефолтных 1024 (retry→2048) не хватало → обрезка → LlmError. max_tokens —
+# лишь ceiling (короткие ответы не дорожают), поэтому берём щедро: 4096, адаптер удвоит на retry
+# до 8192 (предел deepseek-chat).
+_MAX_TOKENS = 4096
 
 ABSTAIN_REPLY = "Не знаю по этому проекту, уточните вопрос."
+# Мягкий ответ, когда провайдер не смог сгенерировать (напр. слишком объёмный ответ обрезан по длине).
+GENERATION_FAILED_REPLY = "Не удалось сформировать ответ — попробуйте задать вопрос точнее или короче."
 
 # Роли, которым доверяем в диалоге. Всё остальное (в т.ч. подсунутый клиентом "system")
 # приводим к "user" — чужой текст НЕ должен попасть в system и переопределить grounding.
@@ -60,13 +67,13 @@ async def _generate(project_id: str, messages: list[ChatMessage], hits: list[dic
         for m in messages[-_MAX_HISTORY:]
     ]
 
-    raw = await llm.chat([system, *dialog], response_format={"type": "json_object"})
+    raw = await llm.chat([system, *dialog], response_format={"type": "json_object"}, max_tokens=_MAX_TOKENS)
     answer, sources, _dropped = grounding.parse_and_validate(raw, hits, project_id)
     if sources:
         return answer, sources
 
     nudge = {"role": "system", "content": grounding.QUOTE_RETRY_NUDGE}
-    raw = await llm.chat([system, nudge, *dialog], response_format={"type": "json_object"})
+    raw = await llm.chat([system, nudge, *dialog], response_format={"type": "json_object"}, max_tokens=_MAX_TOKENS)
     answer, sources, _dropped = grounding.parse_and_validate(raw, hits, project_id)
     return answer, sources
 
@@ -97,6 +104,11 @@ async def chat(req: ChatRequest) -> dict:
     context_hits = hits[:_CONTEXT_N]
     try:
         answer, sources = await _generate(req.project_id, req.messages, context_hits)
+    except LlmError:
+        # Провайдер не смог сгенерировать (напр. объёмный ответ обрезан по длине даже после retry).
+        # Это не «внутренняя ошибка» сервиса — отдаём мягкий ответ, без 500 и без отката на знания модели.
+        logger.warning("генерация /api/chat не удалась (LLM) project_id=%s", req.project_id)
+        return {"answer": GENERATION_FAILED_REPLY, "abstain": True, "sources": []}
     except Exception:
         logger.exception("сбой генерации /api/chat project_id=%s", req.project_id)
         raise HTTPException(status_code=500, detail="внутренняя ошибка")
