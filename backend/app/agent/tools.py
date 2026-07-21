@@ -14,8 +14,10 @@ human-confirm → open_pr (как /pr Этапа 3b).
 """
 import fnmatch
 import logging
+import subprocess
 
 from app.chat.grounding import redact, safe_repo_path
+from app.config import get_settings
 from app.edit import patcher
 from app.indexing import hybrid
 
@@ -25,6 +27,9 @@ _MAX_READ_LINES = 400        # окно read_file (защита контекст
 _MAX_SEARCH_K = 10
 _MAX_LIST = 200
 _SNIPPET_CHARS = 300         # обрезка тела hit в выдаче search_code
+_MAX_GREP_QUERY = 200        # потолок длины подстроки поиска
+_GREP_MAX_RESULTS = 50       # потолок строк-совпадений в выдаче grep
+_GREP_TIMEOUT = 10           # секунд на один grep
 
 # Запрет для ВСЕХ изменяющих инструментов агента (propose_patch и write_file): git-внутренности и
 # ВЕСЬ .github/ — не только workflows, но и CODEOWNERS/dependabot.yml/composite-actions (тоже
@@ -64,6 +69,15 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {
             "glob": {"type": "string", "description": "glob-шаблон, по умолчанию все файлы"},
         }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "grep",
+        "description": "Буквальный поиск подстроки по всем файлам проекта (как grep). Возвращает "
+                       "совпадения «путь:строка:фрагмент». Лучше search_code для точных вещей: "
+                       "идентификаторов, CSS-селекторов, путей, флагов, строк текста.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "точная подстрока (напр. .structure-tree, getUserById, background)"},
+        }, "required": ["query"]},
     }},
     {"type": "function", "function": {
         "name": "propose_patch",
@@ -171,6 +185,36 @@ def _tool_list_files(state: AgentState, args: dict) -> str:
     return "\n".join(paths)
 
 
+def _tool_grep(state: AgentState, args: dict) -> str:
+    """Буквальный поиск подстроки по клону (read-only). subprocess grep (список аргументов, без
+    shell → нет инъекции; `-F` фиксированная строка → нет regex/ReDoS; `--exclude-dir=.git`; `-I`
+    пропускает бинарники). Выдача — путь:строка:фрагмент, redact применяет execute_tool."""
+    query = str(args.get("query", ""))
+    if not query.strip():
+        return "ошибка: пустой query"
+    if len(query) > _MAX_GREP_QUERY:
+        return "ошибка: слишком длинный запрос"
+    repo = get_settings().repos_dir / state.project_id
+    if not repo.is_dir():
+        return "ошибка: клон проекта недоступен"
+    try:
+        proc = subprocess.run(
+            ["grep", "-rnI", "-F", "--exclude-dir=.git", "-m", "5", "-e", query, "."],
+            cwd=str(repo), capture_output=True, text=True, timeout=_GREP_TIMEOUT,
+            env={"PATH": "/usr/bin:/bin"},
+        )
+    except (subprocess.SubprocessError, OSError):
+        return "ошибка: поиск не удался"
+    if proc.returncode not in (0, 1):      # 1 = совпадений нет (не ошибка)
+        return "ошибка: поиск не удался"
+    lines = [ln[2:] if ln.startswith("./") else ln for ln in proc.stdout.splitlines() if ln.strip()]
+    if not lines:
+        return "совпадений не найдено"
+    shown = lines[:_GREP_MAX_RESULTS]
+    suffix = f"\n… ещё {len(lines) - len(shown)} совпадений (уточните запрос)" if len(lines) > len(shown) else ""
+    return "\n".join(shown) + suffix
+
+
 def _tool_propose_patch(state: AgentState, args: dict) -> str:
     file = str(args.get("file", "")).strip()
     old_block = str(args.get("old_block", ""))
@@ -242,13 +286,14 @@ _DISPATCH = {
     "search_code": _tool_search_code,
     "read_file": _tool_read_file,
     "list_files": _tool_list_files,
+    "grep": _tool_grep,
     "propose_patch": _tool_propose_patch,
     "write_file": _tool_write_file,
     "finish": _tool_finish,
 }
 
 # Инструменты, чей результат кэшируем для дедупа (детерминированы по аргументам).
-_CACHEABLE = {"search_code", "read_file", "list_files"}
+_CACHEABLE = {"search_code", "read_file", "list_files", "grep"}
 
 
 def execute_tool(state: AgentState, name: str, args: dict) -> str:

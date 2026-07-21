@@ -121,6 +121,46 @@ def test_propose_patch_rejects_github_non_workflow(data_dir):
     assert "отклонено" in res and st.staged_edits == []
 
 
+def test_grep_finds_literal_string(data_dir):
+    _git_repo({"src/util.py": "def striptags(s):\n    return s\n", "README.md": "# repo\n"})
+    st = tools.AgentState(PID)
+    res = tools.execute_tool(st, "grep", {"query": "striptags"})
+    assert "src/util.py:1:" in res and "striptags" in res
+
+
+def test_grep_no_match(data_dir):
+    _git_repo({"a.py": "x = 1\n"})
+    st = tools.AgentState(PID)
+    assert "не найдено" in tools.execute_tool(st, "grep", {"query": "zzzznotfound"})
+
+
+def test_grep_excludes_git_dir(data_dir):
+    _git_repo({"a.py": "needle_xyz = 1\n"})
+    st = tools.AgentState(PID)
+    res = tools.execute_tool(st, "grep", {"query": "needle_xyz"})
+    assert "a.py:1:" in res and ".git" not in res
+
+
+def test_agent_greps_to_locate_then_patches(data_dir, monkeypatch):
+    """Агент находит файл grep'ом (без явного указания), читает, правит → применимый diff."""
+    _ready()
+    _git_repo({"frontend/index.css": ".structure-tree{background:#fff}\n"})
+    fake = FakeLlm([
+        _resp([_call("1", "grep", {"query": ".structure-tree"})]),
+        _resp([_call("2", "read_file", {"file": "frontend/index.css", "start_line": 1, "end_line": 1})]),
+        _resp([_call("3", "propose_patch", {
+            "file": "frontend/index.css",
+            "old_block": ".structure-tree{background:#fff}\n",
+            "new_block": ".structure-tree{background:#fafbfc}\n", "reason": "мягче",
+        })]),
+        _resp([_call("4", "finish", {"result_text": "Сменил фон .structure-tree", "needs_pr": True})]),
+    ])
+    monkeypatch.setattr(loop, "get_llm", lambda s: fake)
+    body = _client().post(f"/api/projects/{PID}/agent", json={"goal": "сделай фон структуры мягче"}).json()
+    assert body["needs_pr"] is True
+    assert "#fafbfc" in body["diff"]
+
+
 def test_execute_tool_dedup_reads(data_dir):
     _git_repo({"src/util.py": "def f():\n    pass\n"})
     st = tools.AgentState(PID)
