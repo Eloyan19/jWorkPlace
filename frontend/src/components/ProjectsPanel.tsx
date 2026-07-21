@@ -27,6 +27,14 @@ function isInProgress(status: ProjectStatus): boolean {
   return IN_PROGRESS_STATUSES.includes(status)
 }
 
+// Метка статуса: при индексации, если известен total, показываем прогресс «индексация N/M».
+function statusLabel(project: Project): string {
+  if (project.status === 'indexing' && project.progress_total && project.progress_total > 0) {
+    return `индексация ${project.progress_done ?? 0}/${project.progress_total}`
+  }
+  return STATUS_LABELS[project.status]
+}
+
 function isValidRepoUrl(url: string): boolean {
   return url.trim().startsWith('https://github.com/')
 }
@@ -266,7 +274,7 @@ function ProjectsPanel() {
                 <span className="project-name">{project.name}</span>
                 <span className="project-url">{project.url}</span>
               </button>
-              <span className={`badge badge-${project.status}`}>{STATUS_LABELS[project.status]}</span>
+              <span className={`badge badge-${project.status}`}>{statusLabel(project)}</span>
               {project.status === 'error' && (
                 <>
                   {project.error && <span className="project-error-text">{project.error}</span>}

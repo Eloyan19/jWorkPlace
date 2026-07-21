@@ -15,6 +15,9 @@ export interface Project {
   error?: string | null
   indexed_at?: string | null
   can_edit: boolean
+  // Прогресс индексации (эмбеддинга): done из total чанков. Осмысленны только при status==='indexing'.
+  progress_done?: number
+  progress_total?: number
 }
 
 // Один фрагмент кода из hybrid search (Этап 2a). dense_score/bm25_score — сырые скоры каналов

@@ -21,6 +21,9 @@ logger = logging.getLogger("jworkplace.pipeline")
 
 # Одна индексация за раз — защита памяти на 3.8 ГБ.
 _semaphore = asyncio.Semaphore(1)
+# Как часто писать прогресс в БД (каждые N обработанных чанков) — не на каждый чанк, но достаточно
+# часто для живого «N/M» в UI. Запись дешёвая (SQLite), но кэш-хиты идут быстро — не спамим.
+_PROGRESS_EVERY = 8
 # Сильные ссылки на фоновые задачи: asyncio держит лишь weak ref, иначе долгую индексацию
 # может собрать GC и молча отменить. Снимаем ссылку по завершении.
 _tasks: set[asyncio.Task] = set()
@@ -85,6 +88,7 @@ def _run_full(project_id: str, url: str, reindex: bool) -> None:
 
 def _index(project_id: str, repo_dir, secret_ranges: dict) -> None:
     """Собрать чанки индексируемых файлов, заэмбеддить, построить FAISS, записать chunks."""
+    db.set_progress(project_id, 0, 0)   # сброс на старте (reindex мог оставить старые значения)
     rows: list[dict] = []
     texts: list[str] = []
     blob_shas: list[str] = []
@@ -115,9 +119,17 @@ def _index(project_id: str, repo_dir, secret_ranges: dict) -> None:
         _rebuild_fts(project_id, [], [])
         return
 
+    # Прогресс индексации: total известен после чанкинга; throttled-пишем done по ходу эмбеддинга.
+    total = len(texts)
+    db.set_progress(project_id, 0, total)
+
+    def _progress(done: int) -> None:
+        if done % _PROGRESS_EVERY == 0 or done >= total:
+            db.set_progress(project_id, min(done, total), total)
+
     # Часть чанков может не влезть в контекст эмбеддера — kept оставляет только успешные,
     # чтобы rows/vectors/faiss_id оставались согласованными по порядку.
-    vectors, kept = embeddings.embed_documents(blob_shas, texts)
+    vectors, kept = embeddings.embed_documents(blob_shas, texts, progress_cb=_progress)
     rows = [rows[i] for i in kept]
     if not rows:
         faiss_store.build_index(project_id, np.zeros((0, embeddings.EMBED_DIM), dtype="float32"))

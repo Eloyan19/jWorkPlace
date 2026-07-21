@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS projects (
     indexed_at  TEXT,
     error       TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    github_token_enc BLOB
+    github_token_enc BLOB,
+    progress_done  INTEGER NOT NULL DEFAULT 0,
+    progress_total INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS files (
@@ -98,6 +100,7 @@ def init_db() -> None:
     with _connect(settings.db_path) as conn:
         conn.executescript(_SCHEMA)
         _migrate_add_token_column(conn)
+        _migrate_add_progress_columns(conn)
         conn.commit()
 
 
@@ -107,6 +110,15 @@ def _migrate_add_token_column(conn: sqlite3.Connection) -> None:
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
     if "github_token_enc" not in cols:
         conn.execute("ALTER TABLE projects ADD COLUMN github_token_enc BLOB")
+
+
+def _migrate_add_progress_columns(conn: sqlite3.Connection) -> None:
+    """Счётчик прогресса индексации: БД до этой фичи не имеют progress_*. Идемпотентно."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    if "progress_done" not in cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN progress_done INTEGER NOT NULL DEFAULT 0")
+    if "progress_total" not in cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN progress_total INTEGER NOT NULL DEFAULT 0")
 
 
 @contextmanager
@@ -148,6 +160,16 @@ def mark_ready(project_id: str) -> None:
         conn.execute(
             "UPDATE projects SET status = ?, indexed_at = datetime('now'), error = NULL WHERE id = ?",
             (STATUS_READY, project_id),
+        )
+
+
+def set_progress(project_id: str, done: int, total: int) -> None:
+    """Прогресс индексации (эмбеддинга): done из total чанков. Дёшево — вызывается throttled
+    из пайплайна (каждые N чанков). Отдаётся клиенту через _project_dto для показа «N/M»."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE projects SET progress_done = ?, progress_total = ? WHERE id = ?",
+            (done, total, project_id),
         )
 
 

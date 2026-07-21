@@ -29,6 +29,15 @@ def test_recover_stuck(data_dir):
     assert db.get_project("c")["status"] == db.STATUS_ERROR
 
 
+def test_set_progress(data_dir):
+    db.create_project("p", "u", "n", db.STATUS_INDEXING)
+    row = db.get_project("p")
+    assert row["progress_done"] == 0 and row["progress_total"] == 0   # дефолты
+    db.set_progress("p", 3, 10)
+    row = db.get_project("p")
+    assert row["progress_done"] == 3 and row["progress_total"] == 10
+
+
 def test_files_and_indexable(data_dir):
     db.create_project("p", "u", "n", db.STATUS_SCANNING)
     db.replace_files("p", [

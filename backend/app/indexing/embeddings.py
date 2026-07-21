@@ -46,16 +46,23 @@ def _embed_call(client: httpx.Client, text: str) -> np.ndarray | None:
     return vec
 
 
-def embed_documents(blob_shas: list[str], texts: list[str]) -> tuple[np.ndarray, list[int]]:
+def embed_documents(
+    blob_shas: list[str], texts: list[str], progress_cb=None
+) -> tuple[np.ndarray, list[int]]:
     """Заэмбеддить чанки. Возвращает (матрица (M,768) L2-норм., индексы успешных в исходном списке).
 
     Кэш: ключ (blob_sha, sha256(text)). Промах → Ollama, затем в кэш. Чанки, не влезшие в контекст,
     ПРОПУСКАЕМ (kept их не содержит) — индексацию не роняем. Синхронный httpx (вызов из to_thread).
+
+    `progress_cb(done)` — опциональный колбэк прогресса: вызывается с числом обработанных чанков
+    (включая кэш-хиты и пропуски). Пайплайн через него throttled-обновляет progress в БД.
     """
     kept: list[int] = []
     rows: list[np.ndarray] = []
     with httpx.Client() as client:
         for i, (blob_sha, text) in enumerate(zip(blob_shas, texts)):
+            if progress_cb is not None:
+                progress_cb(i)          # i чанков уже обработано до текущего
             h = chunk_hash(text)
             cached = db.cache_get(blob_sha, h) if blob_sha else None
             if cached is not None:
@@ -70,6 +77,8 @@ def embed_documents(blob_shas: list[str], texts: list[str]) -> tuple[np.ndarray,
             kept.append(i)
             if blob_sha:
                 db.cache_put(blob_sha, h, vec.tobytes())
+    if progress_cb is not None:
+        progress_cb(len(texts))         # финальный тик: все чанки обработаны
     if not rows:
         return np.zeros((0, EMBED_DIM), dtype="float32"), []
     vectors = np.vstack(rows).astype("float32")

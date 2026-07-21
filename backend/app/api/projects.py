@@ -77,6 +77,8 @@ def _project_dto(row) -> dict:
         "indexed_at": row["indexed_at"],
         "head_sha": row["head_sha"],
         "can_edit": bool(row["github_token_enc"]),
+        "progress_done": row["progress_done"],
+        "progress_total": row["progress_total"],
     }
 
 

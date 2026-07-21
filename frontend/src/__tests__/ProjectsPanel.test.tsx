@@ -45,6 +45,22 @@ describe('ProjectsPanel', () => {
     expect(screen.getByText('repo-two')).toBeInTheDocument()
   })
 
+  it('показывает прогресс индексации «N/M»', async () => {
+    mockedApi.listProjects.mockResolvedValue([
+      makeProject({ id: 'p3', name: 'idx-repo', status: 'indexing', progress_done: 42, progress_total: 140 }),
+    ])
+    render(<ProjectsPanel />)
+    await waitFor(() => expect(screen.getByText(/индексация 42\/140/i)).toBeInTheDocument())
+  })
+
+  it('без total — обычная метка индексации', async () => {
+    mockedApi.listProjects.mockResolvedValue([
+      makeProject({ id: 'p4', name: 'idx0', status: 'indexing', progress_total: 0 }),
+    ])
+    render(<ProjectsPanel />)
+    await waitFor(() => expect(screen.getByText(/индексация…/i)).toBeInTheDocument())
+  })
+
   it('кнопка "Подключить" вызывает createProject и обновляет список', async () => {
     mockedApi.listProjects.mockResolvedValueOnce([]).mockResolvedValueOnce([makeProject()])
     mockedApi.createProject.mockResolvedValue({ project_id: 'p1', status: 'cloning' })
