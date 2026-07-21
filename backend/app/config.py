@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     jwp_secret_key: str = ""
 
     # --- Индексация (Этап 1) ---
-    ollama_url: str = "http://127.0.0.1:11434"
+    //ollama_url: str = "http://127.0.0.1:11434"
     embed_model: str = "nomic-embed-text"
     # Fail-closed: без gitleaks скан секретов по содержимому невозможен → индексацию прерываем
     # (не индексируем чужой репо с одним лишь фильтром имён). Ставится в False только осознанно.
@@ -77,7 +77,7 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> Settings:
+def get_sett() -> Settings:
     return Settings()
 
 
