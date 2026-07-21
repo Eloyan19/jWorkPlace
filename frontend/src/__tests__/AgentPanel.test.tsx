@@ -38,6 +38,28 @@ describe('AgentPanel', () => {
     expect(mockedApi.runAgent).toHaveBeenCalledWith('abc123', 'найди использования striptags')
   })
 
+  it('«Уточнить» перезапускает агента с прошлой целью + поправкой', async () => {
+    mockedApi.runAgent.mockResolvedValue(run())
+    render(<AgentPanel />)
+    await waitFor(() => expect(screen.getByLabelText(/цель для агента/i)).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/цель для агента/i), { target: { value: 'сделай фон мягче' } })
+    fireEvent.click(screen.getByRole('button', { name: /Запустить агента/i }))
+    await waitFor(() => expect(screen.getByLabelText(/уточнение для агента/i)).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/уточнение для агента/i), {
+      target: { value: 'имелась в виду панель Структура' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Уточнить/i }))
+
+    await waitFor(() =>
+      expect(mockedApi.runAgent).toHaveBeenLastCalledWith(
+        'abc123',
+        'сделай фон мягче\n\nУточнение: имелась в виду панель Структура',
+      ),
+    )
+  })
+
   it('задача-изменение с токеном: показывает diff и открывает PR', async () => {
     mockedApi.runAgent.mockResolvedValue(run({
       needs_pr: true, run_id: 'r1', can_edit: true, result_text: 'Создал CHANGELOG.md',

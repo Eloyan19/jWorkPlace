@@ -16,6 +16,10 @@ function AgentPanel() {
   const [activeId, setActiveId] = useState<string | null>(() => readActiveProject())
   const [project, setProject] = useState<Project | null>(null)
   const [goal, setGoal] = useState('')
+  // lastGoal — полная цель последнего прогона; «Уточнить» дописывает к ней поправку и перезапускает
+  // агента заново (он stateless — контекст несём в тексте цели, без серверной сессии).
+  const [lastGoal, setLastGoal] = useState('')
+  const [refine, setRefine] = useState('')
   const [result, setResult] = useState<AgentRunResponse | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +43,8 @@ function AgentPanel() {
       setResult(null)
       setError(null)
       setPrOutcome(null)
+      setLastGoal('')
+      setRefine('')
     })
   }, [])
 
@@ -66,17 +72,19 @@ function AgentPanel() {
     return () => clearInterval(timer)
   }, [notReady, loadProject])
 
-  async function handleRun(e: FormEvent) {
-    e.preventDefault()
-    const trimmed = goal.trim()
-    if (!trimmed || !activeId) return
+  async function runWithGoal(goalText: string) {
+    if (!activeId) return
     const sentId = activeId
     setRunning(true)
     setError(null)
     setPrOutcome(null)
     try {
-      const res = await runAgent(sentId, trimmed)
-      if (mountedRef.current && activeIdRef.current === sentId) setResult(res)
+      const res = await runAgent(sentId, goalText)
+      if (mountedRef.current && activeIdRef.current === sentId) {
+        setResult(res)
+        setLastGoal(goalText) // следующее «Уточнить» дописывает к этой (уже накопленной) цели
+        setRefine('')
+      }
     } catch (err) {
       if (mountedRef.current && activeIdRef.current === sentId) {
         setError(err instanceof Error ? err.message : 'агент не смог выполнить задачу')
@@ -85,6 +93,20 @@ function AgentPanel() {
     } finally {
       if (mountedRef.current) setRunning(false)
     }
+  }
+
+  async function handleRun(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = goal.trim()
+    if (trimmed) await runWithGoal(trimmed)
+  }
+
+  // «Уточнить» — перезапуск с прошлой целью + поправкой (агент stateless, серверной сессии нет).
+  async function handleRefine(e: FormEvent) {
+    e.preventDefault()
+    const correction = refine.trim()
+    if (!correction || !lastGoal) return
+    await runWithGoal(`${lastGoal}\n\nУточнение: ${correction}`)
   }
 
   async function handleConfirmPr() {
@@ -130,12 +152,30 @@ function AgentPanel() {
           {running && <p className="agent-typing">агент работает…</p>}
           {error && <p className="agent-error">{error}</p>}
           {result && (
-            <AgentResult
-              result={result}
-              prSending={prSending}
-              prOutcome={prOutcome}
-              onConfirmPr={handleConfirmPr}
-            />
+            <>
+              <AgentResult
+                result={result}
+                prSending={prSending}
+                prOutcome={prOutcome}
+                onConfirmPr={handleConfirmPr}
+              />
+              {/* Уточнить: не то, что нужно? Допишите поправку — агент перезапустится с прошлой
+                  целью + этим уточнением (без повторного набора цели). */}
+              <form className="agent-refine" onSubmit={handleRefine}>
+                <input
+                  type="text"
+                  value={refine}
+                  onChange={(e) => setRefine(e.target.value)}
+                  placeholder="не то? уточните: что поправить…"
+                  aria-label="уточнение для агента"
+                  disabled={running || prSending}
+                  maxLength={1000}
+                />
+                <button type="submit" disabled={running || prSending || !refine.trim()}>
+                  {running ? 'работает…' : 'Уточнить'}
+                </button>
+              </form>
+            </>
           )}
 
           <form className="agent-form" onSubmit={handleRun}>
