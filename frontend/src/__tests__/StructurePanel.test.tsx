@@ -65,6 +65,30 @@ describe('StructurePanel', () => {
     expect(mockedApi.getStructure).toHaveBeenCalledWith('abc123')
   })
 
+  it('схлопывает одиночные цепочки папок в одну строку (compact folders)', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject())
+    mockedApi.getStructure.mockResolvedValue({
+      project_id: 'abc123', name: 'repo', file_count: 2, symbol_count: 0,
+      files: [
+        { path: 'backend/app/api/agent.py', lang: 'python', size: 10, excluded: false, symbols: [] },
+        { path: 'backend/app/api/chat.py', lang: 'python', size: 10, excluded: false, symbols: [] },
+      ],
+    })
+
+    render(<StructurePanel />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Показать структуру/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /Показать структуру/i }))
+
+    // Цепочка backend→app→api схлопнута в одну строку; отдельных строк «backend»/«app» нет.
+    await waitFor(() => expect(screen.getByText('backend/app/api')).toBeInTheDocument())
+    expect(screen.queryByText('backend')).not.toBeInTheDocument()
+    expect(screen.queryByText('app')).not.toBeInTheDocument()
+    // Файлы точки ветвления видны (папка раскрыта по умолчанию).
+    expect(screen.getByText('agent.py')).toBeInTheDocument()
+    expect(screen.getByText('chat.py')).toBeInTheDocument()
+  })
+
   it('показывает ошибку при сбое загрузки', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())

@@ -39,6 +39,7 @@ function buildTree(files: FileNode[]): TreeNode[] {
     cur.children.push({ type: 'file', name: parts[parts.length - 1], path: f.path, file: f })
   }
   sortDir(root)
+  for (const c of root.children) if (c.type === 'dir') compactDir(c)
   return root.children
 }
 
@@ -47,6 +48,19 @@ function sortDir(dir: TreeDir): void {
     a.type !== b.type ? (a.type === 'dir' ? -1 : 1) : a.name.localeCompare(b.name),
   )
   for (const c of dir.children) if (c.type === 'dir') sortDir(c)
+}
+
+// «Compact folders» (как в VS Code): пока у папки ровно один подкаталог (и никаких файлов рядом) —
+// схлопываем цепочку в одну строку `a/b/c`. Папку с единственным ФАЙЛОМ не трогаем. Ключ строки —
+// путь самой глубокой папки цепочки (он есть в allDirPaths, поэтому стартовое «раскрыто» работает).
+function compactDir(dir: TreeDir): void {
+  while (dir.children.length === 1 && dir.children[0].type === 'dir') {
+    const child = dir.children[0]
+    dir.name = `${dir.name}/${child.name}`
+    dir.path = child.path
+    dir.children = child.children
+  }
+  for (const c of dir.children) if (c.type === 'dir') compactDir(c)
 }
 
 // Все пути каталогов (для «развернуть всё» и стартового состояния — папки раскрыты, файлы свёрнуты).
