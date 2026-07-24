@@ -28,7 +28,9 @@ router = APIRouter(prefix="/api/projects")
 
 _K = 6                # hybrid_search-кандидатов на запрос
 _CONTEXT_CAP = 12      # суммарный кап RAG-чанков в промпте
-_MAX_TOKENS = 2048     # бюджет на ответ (адаптер удвоит на retry при обрезке finish_reason=length)
+_MAX_TOKENS = 8192     # бюджет на ответ (адаптер удвоит на retry→16384 при finish_reason=length).
+                       # Не 2048: dogfood-ревью ВСЕЙ ветки (diff до _DIFF_LIMIT) даёт много находок —
+                       # JSON-ответ не влезал в 4096 → «обрезан по длине дважды» → 500 (см. PR #6).
 
 # --- бюджет diff для LLM: единый источник правды, а не независимое магическое число ---
 #
