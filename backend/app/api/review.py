@@ -38,7 +38,8 @@ _MAX_TOKENS = 2048     # бюджет на ответ (адаптер удвои
 # _CONTEXT_CAP здесь или MAX_CHUNK_LINES (app/indexing/chunker.py) вырастут, _RAG_CONTEXT_CEILING
 # ниже пересчитается сам — не нужно синхронизировать два места руками.
 #
-# Модель ревью — `deepseek-chat`, контекст 128K токенов на весь запрос (system+user+ответ).
+# Модель ревью — `deepseek-v4-flash` (env DEEPSEEK_MODEL). 128K — КОНСЕРВАТИВНЫЙ пол бюджета на
+# весь запрос (system+user+ответ); реальный контекст модели больше, так что assert ниже — с запасом.
 _MODEL_CONTEXT_TOKENS = 128_000
 # Код/diff токенизируется плотнее прозы — берём консервативно МЕНЬШЕ symbols/token (меньше =
 # меньше кажущегося свободного места), чтобы не переоценить бюджет.
@@ -68,7 +69,7 @@ _MAX_SAFE_DIFF_CHARS = _MODEL_CONTEXT_TOKENS * _CHARS_PER_TOKEN - _OVERHEAD_CEIL
 # лимит). 200_000 с запасом перекрывает PR #6 (~187 КБ) целиком, без усечения.
 _DIFF_LIMIT = 200_000
 assert _DIFF_LIMIT <= _MAX_SAFE_DIFF_CHARS, (
-    "_DIFF_LIMIT превышает бюджет контекста deepseek-chat при текущих _CONTEXT_CAP/"
+    "_DIFF_LIMIT превышает бюджет контекста deepseek-v4-flash при текущих _CONTEXT_CAP/"
     "MAX_CHUNK_LINES — либо снижай _DIFF_LIMIT, либо снижай _CONTEXT_CAP/MAX_CHUNK_LINES."
 )
 

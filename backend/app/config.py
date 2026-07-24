@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     jwp_data_dir: str = "/var/lib/jworkplace"
     llm_provider: str = "deepseek"
     deepseek_api_key: str = ""
+    # Имя модели DeepSeek — env-переопределяемое (DEEPSEEK_MODEL), а не хардкод: провайдер
+    # ретайрит имена (июль 2026 — `deepseek-chat` снят, теперь `deepseek-v4-*`), и следующий
+    # ренейм должен быть правкой .env, а не кодом+деплоем. Дефолт = non-thinking (преемник
+    # `deepseek-chat`), совместим с tools/JSON-режимом; `deepseek-v4-pro` — thinking-вариант.
+    deepseek_model: str = "deepseek-v4-flash"
     cors_origins: str = ""
 
     # Токен-барьер публичного URL (проверяется в nginx; backend его не валидирует, но
