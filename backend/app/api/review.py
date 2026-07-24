@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from app import db
 from app.config import get_settings
+from app.indexing.chunker import MAX_CHUNK_LINES
 from app.llm.deepseek import get_llm
 from app.review import reviewer
 
@@ -28,16 +29,66 @@ router = APIRouter(prefix="/api/projects")
 _K = 6                # hybrid_search-кандидатов на запрос
 _CONTEXT_CAP = 12      # суммарный кап RAG-чанков в промпте
 _MAX_TOKENS = 2048     # бюджет на ответ (адаптер удвоит на retry при обрезке finish_reason=length)
-_DIFF_LIMIT = 100_000  # символов — совпадает с Field(max_length) ниже (труcate_diff — вторая линия обороны)
+
+# --- бюджет diff для LLM: единый источник правды, а не независимое магическое число ---
+#
+# _DIFF_LIMIT — мягкий потолок «сколько diff реально уходит в промпт ревью» (используется
+# truncate_diff, который отмечает факт обрезки для честного предупреждения в markdown — см.
+# generate_review). Выводим его из РЕАЛЬНЫХ констант бюджета, а не гадаем на глаз: если
+# _CONTEXT_CAP здесь или MAX_CHUNK_LINES (app/indexing/chunker.py) вырастут, _RAG_CONTEXT_CEILING
+# ниже пересчитается сам — не нужно синхронизировать два места руками.
+#
+# Модель ревью — `deepseek-chat`, контекст 128K токенов на весь запрос (system+user+ответ).
+_MODEL_CONTEXT_TOKENS = 128_000
+# Код/diff токенизируется плотнее прозы — берём консервативно МЕНЬШЕ symbols/token (меньше =
+# меньше кажущегося свободного места), чтобы не переоценить бюджет.
+_CHARS_PER_TOKEN = 3
+# Единственное недоказуемое числом допущение во всей формуле (нет исходной константы «длина
+# строки кода») — средняя длина строки чанка. Раздут специально в БОЛЬШУЮ сторону (запас).
+_ASSUMED_CHARS_PER_LINE = 80
+
+# RAG-контекст в промпте: единственный источник правды по объёму — _CONTEXT_CAP (сколько чанков,
+# локально выше) × MAX_CHUNK_LINES (максимум строк в чанке, app/indexing/chunker.py).
+_RAG_CONTEXT_CEILING_CHARS = _CONTEXT_CAP * MAX_CHUNK_LINES * _ASSUMED_CHARS_PER_LINE
+
+# Заголовок/тело PR и системный промпт — фиксированные величины запроса.
+_SYSTEM_PROMPT_CEILING_CHARS = 1_500       # REVIEW_SYSTEM_PROMPT — статический текст
+_PR_TITLE_MAX_CHARS = 1_000                # держим в синхроне с Field(max_length) ниже
+_PR_BODY_MAX_CHARS = 10_000                # держим в синхроне с Field(max_length) ниже
+_META_CEILING_CHARS = _SYSTEM_PROMPT_CEILING_CHARS + _PR_TITLE_MAX_CHARS + _PR_BODY_MAX_CHARS
+
+# Ответ модели: _MAX_TOKENS, адаptер удваивает на retry при finish_reason=length.
+_OUTPUT_CEILING_CHARS = (_MAX_TOKENS * 2) * _CHARS_PER_TOKEN
+
+_OVERHEAD_CEILING_CHARS = _RAG_CONTEXT_CEILING_CHARS + _META_CEILING_CHARS + _OUTPUT_CEILING_CHARS
+_MAX_SAFE_DIFF_CHARS = _MODEL_CONTEXT_TOKENS * _CHARS_PER_TOKEN - _OVERHEAD_CEILING_CHARS
+
+# Финальное значение — круглое число В ПРЕДЕЛАХ вычисленного бюджета (не сам _MAX_SAFE_DIFF_CHARS
+# впрямую: он «дрожит» при мелких правках допущений выше, а нам нужен стабильный, легко узнаваемый
+# лимит). 200_000 с запасом перекрывает PR #6 (~187 КБ) целиком, без усечения.
+_DIFF_LIMIT = 200_000
+assert _DIFF_LIMIT <= _MAX_SAFE_DIFF_CHARS, (
+    "_DIFF_LIMIT превышает бюджет контекста deepseek-chat при текущих _CONTEXT_CAP/"
+    "MAX_CHUNK_LINES — либо снижай _DIFF_LIMIT, либо снижай _CONTEXT_CAP/MAX_CHUNK_LINES."
+)
+
+# _REQUEST_MAX_DIFF_LEN — жёсткий протокольный потолок Field(max_length): защита от абсурдных
+# payload (DoS/раздутый бинарный дамп), НЕ бюджет LLM. Специально БОЛЬШЕ _DIFF_LIMIT — иначе
+# Pydantic отбрасывал бы diff между _DIFF_LIMIT и этим потолком 422-кой ещё ДО truncate_diff,
+# и честное предупреждение об усечении (см. generate_review) никогда бы не срабатывало.
+# Совпадает с аварийным потолком `head -c` в ai-review.yml.
+_REQUEST_MAX_DIFF_LEN = 2_000_000
 
 
 class ReviewRequest(BaseModel):
-    # Потолок совпадает с truncate_diff — 422 раньше, чем сервер начнёт работу с гигантским diff.
-    diff: str = Field(max_length=_DIFF_LIMIT)
+    # Хард-лимит запроса (_REQUEST_MAX_DIFF_LEN), НЕ мягкий бюджет LLM (_DIFF_LIMIT) — иначе
+    # graceful truncate_diff() ниже стал бы недостижимым мёртвым кодом (см. комментарий выше).
+    diff: str = Field(max_length=_REQUEST_MAX_DIFF_LEN)
     changed_files: list[str] = Field(default_factory=list, max_length=500)
     pr_number: int
-    pr_title: str = Field(default="", max_length=1000)
-    pr_body: str | None = Field(default=None, max_length=10_000)
+    # max_length держим в синхроне с _PR_TITLE_MAX_CHARS/_PR_BODY_MAX_CHARS выше (тот же бюджет).
+    pr_title: str = Field(default="", max_length=_PR_TITLE_MAX_CHARS)
+    pr_body: str | None = Field(default=None, max_length=_PR_BODY_MAX_CHARS)
 
 
 @router.post("/{project_id}/review")

@@ -171,7 +171,7 @@ def parse_diff(diff: str) -> list[Hunk]:
     return hunks
 
 
-def truncate_diff(diff: str, limit: int = 100_000) -> tuple[str, bool]:
+def truncate_diff(diff: str, limit: int = 200_000) -> tuple[str, bool]:
     """Усечь diff до `limit` символов по границе строки (не разрывая хунк на середине строки).
     Возвращает (diff, был_ли_обрезан) — флаг используется для пометки в markdown."""
     if len(diff) <= limit:
