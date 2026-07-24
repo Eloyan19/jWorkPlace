@@ -174,3 +174,41 @@ export type PrResponse =
       ok: false
       reason: string
     }
+
+// База знаний / выжимка о проекте: концепт уже известен пользователю — показываем только имя.
+export interface ConceptMention {
+  name: string
+}
+
+// Новый (ещё не известный) концепт — раскрываем подробно, с обоснованием по коду проекта.
+export interface ConceptEvidence {
+  citation: string
+  quote: string
+}
+
+export interface ConceptDetail {
+  name: string
+  detail: string
+  evidence: ConceptEvidence[]
+}
+
+// Глобальный каталог «что я уже знаю» (GET /api/knowledge/concepts, опциональная панель).
+export interface KnownConcept {
+  name: string
+  category: string
+}
+
+// Дискриминированный union по status: generating — идёт первая генерация (поллинг), error — сбой
+// генерации (сообщение уже безопасно для показа), ready — есть выжимка + разбор new/known.
+export type ProjectSummary =
+  | { status: 'generating' }
+  | { status: 'error'; reason: string }
+  | {
+      status: 'ready'
+      overview: string
+      tech: string[]
+      concepts: {
+        new: ConceptDetail[]
+        known: ConceptMention[]
+      }
+    }
