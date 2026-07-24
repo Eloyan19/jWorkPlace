@@ -53,10 +53,15 @@ jobs:
           # diff: усекаем до лимита backend (~100 KB), чтобы огромный PR не ловил 422. iconv -c
           # отбрасывает битый UTF-8-хвост (head -c мог разрезать многобайтный символ) — иначе
           # jq --rawfile упадёт на невалидном UTF-8 и уронит весь шаг.
+          # ВАЖНО: head и iconv — РАЗДЕЛЬНО, а не в пайпе. Если head -c режет посреди многобайтного
+          # символа, iconv пишет валидный префикс, но возвращает НЕНУЛЕВОЙ код («incomplete character
+          # at end of buffer») — под `bash -e` это роняло весь шаг на больших PR (см. PR #6). `|| true`
+          # + stderr в /dev/null: оставляем валидный префикс, не падаем на усечённом хвосте.
           # `--repo` обязателен: без него gh pr diff/view лезут в локальный git (которого на
           # раннере нет — мы не делаем checkout), а с --repo идут через API. Быстрее и без checkout.
           gh pr diff "$PR_NUMBER" --repo "$REPO" > diff.raw || { echo "::warning::gh pr diff не удался"; exit 0; }
-          head -c 100000 diff.raw | iconv -f UTF-8 -t UTF-8 -c > diff.txt
+          head -c 100000 diff.raw > diff.cut
+          iconv -f UTF-8 -t UTF-8 -c < diff.cut > diff.txt 2>/dev/null || true
 
           # Изменённые файлы — массивом путей.
           gh pr view "$PR_NUMBER" --repo "$REPO" --json files --jq '[.files[].path]' > files.json
