@@ -5,6 +5,31 @@
 
 ---
 
+## База знаний: выжимка о репо + персонализация «что я уже знаю» (НЕ задеплоено)
+
+Новая вкладка **«О проекте»**: после индексации сервис даёт grounded-выжимку репо (overview +
+технологии/паттерны/фичи) и ведёт **глобальный (single-user) каталог концептов** — при следующем
+репо уже знакомое показывается одной строкой, новое раскрывается подробно. Профиль P1 (Explore-
+консилиум architect+llm-engineer+security-auditor → Plan → Build ∥ worktree → Review+SecReview → Fix).
+
+- **Backend `knowledge/`.** `generator.py` (материал детерминированно: `db.project_tree`-скелет +
+  манифесты + README + 6 проб `hybrid_search` → **1 вызов `deepseek-chat`** JSON → fail-closed
+  валидация с line-based цитатами, как в `chat/grounding`), `matching.py` (каскад дедупа
+  slug→эмбеддинг nomic≥0.85→LLM-судья серой зоны 0.75–0.85 батчем), `render.py` (DB→DTO, split
+  new/known). `api/knowledge.py` (`GET /projects/{id}/summary` lazy-генерация+`_gen_in_flight`+кэш
+  по `head_sha`, `POST /read` авто-пометка known, `GET /concepts`). БД: `project_summaries`,
+  глобальный `concepts` (+embedding BLOB для каскада), `project_concepts`; `delete_project`
+  чистит связи, глобальный каталог сохраняет (обучение персистентно).
+- **Frontend.** `SummaryPanel` (проп `active` — загрузка/поллинг/пометка known только на открытой
+  вкладке), `types.ts` (union по `status`), `api.ts` (`getSummary`/`markSummaryRead`/`getConcepts`).
+- **Безопасность (SecReview: Ship, must-fix нет).** Тройной барьер секретов (gitleaks → `redact` на
+  вход → `redact` на выход LLM перед записью), весь недоверенный контент (репо + межпроектные
+  описания в промпте судьи) в нонс-делимитерах + anti-injection, KB строго вне grounded code-Q&A.
+- **Тесты: 290 pytest + 62 vitest** (+ live-smoke эндпоинтов). Follow-up (next): eval precision
+  дедупа концептов на golden-паре репо.
+
+---
+
 ## Учебные задания 1–3 (MVP поверх фундамента, НЕ задеплоено)
 
 - **Зад.1 — `/help` + структура проекта.** `db.project_tree` (дерево files+символы из chunks, БЕЗ

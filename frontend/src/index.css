@@ -1297,3 +1297,150 @@ body {
     border-color: rgba(255, 255, 255, 0.15);
   }
 }
+
+/* --- О проекте: выжимка + персонализация обучения --- */
+.summary-panel {
+  margin-top: 2.5rem;
+  text-align: left;
+}
+
+.summary-panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+
+.summary-panel h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+.summary-hint {
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.summary-error {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.summary-overview {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+
+.summary-tech,
+.summary-known {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.summary-chip {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(47, 111, 237, 0.12);
+  color: #2f6fed;
+  font-size: 0.78rem;
+}
+
+.summary-chip-known {
+  background: rgba(0, 0, 0, 0.07);
+  color: inherit;
+  opacity: 0.75;
+}
+
+@media (prefers-color-scheme: dark) {
+  .summary-chip-known {
+    background: rgba(255, 255, 255, 0.09);
+  }
+}
+
+.summary-section {
+  margin-bottom: 1.5rem;
+}
+
+.summary-concept-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.summary-concept {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  .summary-concept {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.summary-concept-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+}
+
+.summary-concept-detail {
+  padding: 0 0.75rem 0.75rem 1.65rem;
+}
+
+.summary-concept-detail p {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.summary-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-evidence-citation {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-weight: 600;
+  font-size: 0.75rem;
+  word-break: break-all;
+  opacity: 0.85;
+}
+
+.summary-evidence-quote {
+  margin: 0.2rem 0 0;
+  padding: 0.55rem;
+  overflow-x: auto;
+  border-radius: 0.4rem;
+  background: rgba(0, 0, 0, 0.06);
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .summary-evidence-quote {
+    background: rgba(0, 0, 0, 0.25);
+  }
+}
