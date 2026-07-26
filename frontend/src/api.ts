@@ -285,9 +285,10 @@ export async function getSummary(projectId: string): Promise<ProjectSummary> {
   return (await res.json()) as ProjectSummary
 }
 
-// Пометить концепты выжимки известными («прочитал → знаю»). Идемпотентно на backend.
-export async function markSummaryRead(projectId: string): Promise<{ ok: true }> {
-  const res = await fetch(`/api/knowledge/projects/${projectId}/read`, {
+// Пометить один концепт изученным — по явному клику пользователя (ручная кнопка «Изучено»,
+// никакого авто-вызова при простом открытии выжимки).
+export async function markConceptKnown(slug: string): Promise<{ ok: true }> {
+  const res = await fetch(`/api/knowledge/concepts/${slug}/known`, {
     method: 'POST',
     headers: authHeaders(),
   })
@@ -295,6 +296,18 @@ export async function markSummaryRead(projectId: string): Promise<{ ok: true }> 
     throw new Error(await readErrorMessage(res))
   }
   return (await res.json()) as { ok: true }
+}
+
+// Мягкий сброс базы знаний: все концепты снова «не изучено».
+export async function resetKnownConcepts(): Promise<{ ok: true; reset: number }> {
+  const res = await fetch('/api/knowledge/concepts/reset', {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { ok: true; reset: number }
 }
 
 // Глобальный каталог «что я уже знаю» (опциональная панель, не привязана к проекту).

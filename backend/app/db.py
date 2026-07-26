@@ -548,9 +548,9 @@ def get_project_concepts(project_id: str) -> list[sqlite3.Row]:
     """Концепты проекта + их project-scoped раскрытие, джойном на глобальный каталог."""
     with get_conn() as conn:
         return conn.execute(
-            "SELECT pc.concept_id AS concept_id, c.name AS name, c.category AS category, "
-            "c.description AS description, c.known AS known, pc.detail AS detail, "
-            "pc.evidence AS evidence "
+            "SELECT pc.concept_id AS concept_id, c.slug AS slug, c.name AS name, "
+            "c.category AS category, c.description AS description, c.known AS known, "
+            "pc.detail AS detail, pc.evidence AS evidence "
             "FROM project_concepts pc JOIN concepts c ON c.id = pc.concept_id "
             "WHERE pc.project_id = ?",
             (project_id,),
@@ -566,6 +566,29 @@ def mark_concepts_known(project_id: str) -> None:
             "WHERE known = 0 AND id IN (SELECT concept_id FROM project_concepts WHERE project_id = ?)",
             (project_id,),
         )
+
+
+def mark_concept_known(slug: str) -> bool:
+    """Пометить ОДИН концепт известным вручную (ручная альтернатива авто-`mark_concepts_known`).
+    Идемпотентно: уже известный (known=1) не трогает `known_at`. Возвращает True, если slug
+    найден в каталоге (независимо от того, потребовалось ли реальное изменение строки)."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE concepts SET known = 1, known_at = COALESCE(known_at, datetime('now')) "
+            "WHERE slug = ?",
+            (slug,),
+        )
+        return cur.rowcount > 0
+
+
+def reset_known_catalog() -> int:
+    """Мягкий сброс: снять known со всех концептов каталога. Сами строки `concepts` и связи
+    `project_concepts` не удаляем — только `known`/`known_at`. Возвращает число сброшенных."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE concepts SET known = 0, known_at = NULL WHERE known = 1"
+        )
+        return cur.rowcount
 
 
 def list_known_concepts() -> list[sqlite3.Row]:

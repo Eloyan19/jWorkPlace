@@ -23,6 +23,7 @@ function readySummary(): ProjectSummary {
     concepts: {
       new: [
         {
+          slug: 'hybrid-search',
           name: 'Hybrid search',
           detail: 'Комбинирует лексический и dense поиск через RRF.',
           evidence: [{ citation: 'backend/app/indexing/hybrid.py::hybrid_search::10-40', quote: 'def hybrid_search(' }],
@@ -37,6 +38,7 @@ describe('SummaryPanel', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.resetAllMocks()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -58,14 +60,12 @@ describe('SummaryPanel', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(mockedApi.getProject).not.toHaveBeenCalled()
     expect(mockedApi.getSummary).not.toHaveBeenCalled()
-    expect(mockedApi.markSummaryRead).not.toHaveBeenCalled()
   })
 
-  it('рендерит new подробно (раскрываемо) и known — только именем; markSummaryRead вызван один раз', async () => {
+  it('рендерит new подробно (раскрываемо) и known — только именем; НЕ зовёт авто-пометку', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())
     mockedApi.getSummary.mockResolvedValue(readySummary())
-    mockedApi.markSummaryRead.mockResolvedValue({ ok: true })
 
     render(<SummaryPanel active />)
 
@@ -80,50 +80,77 @@ describe('SummaryPanel', () => {
     await waitFor(() => expect(screen.getByText(/Комбинирует лексический/)).toBeInTheDocument())
     expect(screen.getByText(/hybrid.py::hybrid_search::10-40/)).toBeInTheDocument()
 
-    await waitFor(() => expect(mockedApi.markSummaryRead).toHaveBeenCalledTimes(1))
-    expect(mockedApi.markSummaryRead).toHaveBeenCalledWith('abc123')
+    // Никакой авто-пометки — открытие/раскрытие концепта не зовёт backend.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockedApi.markConceptKnown).not.toHaveBeenCalled()
   })
 
-  it('known-концепт без new не вызывает markSummaryRead', async () => {
+  it('кнопка «Изучено» зовёт markConceptKnown и переносит концепт в «Уже знакомо»', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())
-    mockedApi.getSummary.mockResolvedValue({
-      status: 'ready',
-      overview: 'о проекте',
-      tech: [],
-      concepts: { new: [], known: [{ name: 'FastAPI роутеры' }] },
-    })
+    mockedApi.getSummary.mockResolvedValue(readySummary())
+    mockedApi.markConceptKnown.mockResolvedValue({ ok: true })
 
     render(<SummaryPanel active />)
 
-    await waitFor(() => expect(screen.getByText('о проекте')).toBeInTheDocument())
-    await new Promise((r) => setTimeout(r, 0))
-    expect(mockedApi.markSummaryRead).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByText('Hybrid search')).toBeInTheDocument())
+    screen.getByRole('button', { name: 'Изучено' }).click()
+
+    await waitFor(() => expect(mockedApi.markConceptKnown).toHaveBeenCalledWith('hybrid-search'))
+    // концепт исчез из «Новое для вас» и появился в «Уже знакомо»
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Hybrid search/i })).not.toBeInTheDocument())
+    const knownList = screen.getByText('FastAPI роутеры').closest('ul')
+    expect(knownList).not.toBeNull()
+    expect(knownList!.textContent).toContain('Hybrid search')
   })
 
-  it(
-    'поллит пока backend отдаёт generating, затем показывает ready',
-    async () => {
-      localStorage.setItem('jwp_active_project', 'abc123')
-      mockedApi.getProject.mockResolvedValue(readyProject())
-      mockedApi.getSummary
-        .mockResolvedValueOnce({ status: 'generating' })
-        .mockResolvedValueOnce({ status: 'generating' })
-        .mockResolvedValueOnce(readySummary())
-      mockedApi.markSummaryRead.mockResolvedValue({ ok: true })
+  it('кнопка «Очистить базу знаний» после подтверждения зовёт resetKnownConcepts и перезагружает summary', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject())
+    mockedApi.getSummary.mockResolvedValue(readySummary())
+    mockedApi.resetKnownConcepts.mockResolvedValue({ ok: true, reset: 3 })
 
-      render(<SummaryPanel active />)
+    render(<SummaryPanel active />)
 
-      await waitFor(() => expect(screen.getByText(/формируем выжимку/i)).toBeInTheDocument())
-      expect(mockedApi.getSummary).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByText('Очистить базу знаний')).toBeInTheDocument())
+    screen.getByRole('button', { name: 'Очистить базу знаний' }).click()
 
-      // Реальные интервалы поллинга (2000мс) — ждём, пока третий ответ (ready) дойдёт до рендера.
-      await waitFor(() => expect(mockedApi.getSummary).toHaveBeenCalledTimes(3), { timeout: 8_000 })
-      await waitFor(() => expect(screen.getByText(/Сервис индексирует репозитории/)).toBeInTheDocument())
-      expect(mockedApi.markSummaryRead).toHaveBeenCalledTimes(1)
-    },
-    10_000,
-  )
+    await waitFor(() => expect(mockedApi.resetKnownConcepts).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockedApi.getSummary).toHaveBeenCalledTimes(2))
+  })
+
+  it('отмена подтверждения не зовёт resetKnownConcepts', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject())
+    mockedApi.getSummary.mockResolvedValue(readySummary())
+
+    render(<SummaryPanel active />)
+
+    await waitFor(() => expect(screen.getByText('Очистить базу знаний')).toBeInTheDocument())
+    screen.getByRole('button', { name: 'Очистить базу знаний' }).click()
+
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockedApi.resetKnownConcepts).not.toHaveBeenCalled()
+  })
+
+  it('поллит пока backend отдаёт generating, затем показывает ready', async () => {
+    localStorage.setItem('jwp_active_project', 'abc123')
+    mockedApi.getProject.mockResolvedValue(readyProject())
+    mockedApi.getSummary
+      .mockResolvedValueOnce({ status: 'generating' })
+      .mockResolvedValueOnce({ status: 'generating' })
+      .mockResolvedValueOnce(readySummary())
+
+    render(<SummaryPanel active />)
+
+    await waitFor(() => expect(screen.getByText(/формируем выжимку/i)).toBeInTheDocument())
+    expect(mockedApi.getSummary).toHaveBeenCalledTimes(1)
+
+    // Реальные интервалы поллинга (2000мс) — ждём, пока третий ответ (ready) дойдёт до рендера.
+    await waitFor(() => expect(mockedApi.getSummary).toHaveBeenCalledTimes(3), { timeout: 8_000 })
+    await waitFor(() => expect(screen.getByText(/Сервис индексирует репозитории/)).toBeInTheDocument())
+  }, 10_000)
 
   it('показывает ошибку генерации из status:"error"', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')

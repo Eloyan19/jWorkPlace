@@ -28,7 +28,9 @@ def render(project_id: str) -> dict:
                 evidence = json.loads(row["evidence"])
             except (json.JSONDecodeError, TypeError):
                 evidence = []
-        new_concepts.append({"name": row["name"], "detail": row["detail"], "evidence": evidence})
+        new_concepts.append(
+            {"slug": row["slug"], "name": row["name"], "detail": row["detail"], "evidence": evidence}
+        )
 
     try:
         tech = json.loads(summary["tech"]) if summary["tech"] else []

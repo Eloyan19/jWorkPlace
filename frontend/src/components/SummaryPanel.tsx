@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getProject, getSummary, markSummaryRead } from '../api'
+import { getProject, getSummary, markConceptKnown, resetKnownConcepts } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
-import type { Project, ProjectSummary } from '../types'
+import type { ConceptDetail, Project, ProjectSummary } from '../types'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -27,9 +27,6 @@ function SummaryPanel({ active }: { active: boolean }) {
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
 
-  // project_id, для которого уже вызван markSummaryRead — не звать повторно, пока проект не сменится.
-  const markedRef = useRef<string | null>(null)
-
   useEffect(() => {
     return subscribeActiveProject((id) => {
       setActiveId(id)
@@ -37,7 +34,6 @@ function SummaryPanel({ active }: { active: boolean }) {
       setSummary(null)
       setError(null)
       setExpandedNew(new Set())
-      markedRef.current = null
     })
   }, [])
 
@@ -79,13 +75,6 @@ function SummaryPanel({ active }: { active: boolean }) {
       if (!mountedRef.current || activeIdRef.current !== loadedId) return
       setSummary(res)
       setError(null)
-      if (res.status === 'ready' && res.concepts.new.length > 0 && markedRef.current !== loadedId) {
-        markedRef.current = loadedId
-        markSummaryRead(loadedId).catch(() => {
-          // сеть подвела — выжимку пользователь уже увидел, при следующем открытии попробуем снова
-          if (activeIdRef.current === loadedId) markedRef.current = null
-        })
-      }
     } catch (err) {
       if (mountedRef.current && activeIdRef.current === loadedId) {
         setError(err instanceof Error ? err.message : 'не удалось загрузить выжимку')
@@ -106,17 +95,71 @@ function SummaryPanel({ active }: { active: boolean }) {
     return () => clearInterval(timer)
   }, [active, projectReady, summary?.status, loadSummary])
 
-  const toggleNew = useCallback((name: string) => {
+  const toggleNew = useCallback((slug: string) => {
     setExpandedNew((prev) => {
       const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
+      next.has(slug) ? next.delete(slug) : next.add(slug)
       return next
     })
   }, [])
 
+  // Ручная пометка «изучено» по клику — переносим концепт из «нового» в «знакомо» оптимистично,
+  // без перезагрузки summary (не теряем раскрытые/прокрутку остальных концептов).
+  const handleMarkKnown = useCallback(
+    async (concept: ConceptDetail) => {
+      const targetId = activeId
+      try {
+        await markConceptKnown(concept.slug)
+        if (!mountedRef.current || activeIdRef.current !== targetId) return
+        setSummary((prev) => {
+          if (!prev || prev.status !== 'ready') return prev
+          return {
+            ...prev,
+            concepts: {
+              new: prev.concepts.new.filter((c) => c.slug !== concept.slug),
+              known: [...prev.concepts.known, { name: concept.name }],
+            },
+          }
+        })
+        setExpandedNew((prev) => {
+          if (!prev.has(concept.slug)) return prev
+          const next = new Set(prev)
+          next.delete(concept.slug)
+          return next
+        })
+      } catch (err) {
+        if (mountedRef.current && activeIdRef.current === targetId) {
+          setError(err instanceof Error ? err.message : 'не удалось отметить концепт изученным')
+        }
+      }
+    },
+    [activeId],
+  )
+
+  // Мягкий сброс базы знаний целиком — после подтверждения перезагружаем summary с backend.
+  const handleReset = useCallback(async () => {
+    if (!window.confirm('Сбросить базу знаний? Все концепты снова станут «новыми».')) return
+    const targetId = activeId
+    try {
+      await resetKnownConcepts()
+      if (mountedRef.current && activeIdRef.current === targetId) loadSummary()
+    } catch (err) {
+      if (mountedRef.current && activeIdRef.current === targetId) {
+        setError(err instanceof Error ? err.message : 'не удалось сбросить базу знаний')
+      }
+    }
+  }, [activeId, loadSummary])
+
   return (
     <section className="summary-panel">
-      <h2>О проекте</h2>
+      <div className="summary-header">
+        <h2>О проекте</h2>
+        {summary?.status === 'ready' && (
+          <button type="button" className="summary-reset-button" onClick={handleReset}>
+            Очистить базу знаний
+          </button>
+        )}
+      </div>
 
       {!activeId ? (
         <p className="summary-hint">выберите готовый проект в списке выше</p>
@@ -153,18 +196,27 @@ function SummaryPanel({ active }: { active: boolean }) {
               <h3>Новое для вас</h3>
               <ul className="summary-concept-list">
                 {summary.concepts.new.map((c) => {
-                  const isOpen = expandedNew.has(c.name)
+                  const isOpen = expandedNew.has(c.slug)
                   return (
-                    <li key={c.name} className="summary-concept">
-                      <button
-                        type="button"
-                        className="summary-concept-toggle"
-                        onClick={() => toggleNew(c.name)}
-                        aria-expanded={isOpen}
-                      >
-                        <span className="tree-caret">{isOpen ? '▾' : '▸'}</span>
-                        {c.name}
-                      </button>
+                    <li key={c.slug} className="summary-concept">
+                      <div className="summary-concept-header">
+                        <button
+                          type="button"
+                          className="summary-concept-toggle"
+                          onClick={() => toggleNew(c.slug)}
+                          aria-expanded={isOpen}
+                        >
+                          <span className="tree-caret">{isOpen ? '▾' : '▸'}</span>
+                          {c.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="summary-concept-mark-known"
+                          onClick={() => handleMarkKnown(c)}
+                        >
+                          Изучено
+                        </button>
+                      </div>
                       {isOpen && (
                         <div className="summary-concept-detail">
                           <p>{c.detail}</p>

@@ -187,6 +187,7 @@ export interface ConceptEvidence {
 }
 
 export interface ConceptDetail {
+  slug: string
   name: string
   detail: string
   evidence: ConceptEvidence[]

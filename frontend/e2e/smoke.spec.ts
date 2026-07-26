@@ -184,3 +184,44 @@ test('S5: создать, проверить, удалить проект', asyn
     if (stray) await page.request.delete(`/api/projects/${stray.id}`)
   }
 })
+
+/**
+ * S6 — База знаний: ручная пометка «Изучено» + «Очистить базу знаний».
+ * Проверяет новую фичу: темы попадают в «известное» ТОЛЬКО по кнопке (без авто-пометки при
+ * открытии), а «Очистить» мягко сбрасывает всё обратно в «новое».
+ */
+test('S6: база знаний — «Изучено» и очистка', async ({ page }) => {
+  await page.goto('/')
+  const selected = await selectReadyProject(page)
+  if (!selected) {
+    console.log('  нет ready-проектов — skip')
+    test.skip()
+    return
+  }
+  await page.getByRole('tab', { name: 'О проекте' }).click()
+
+  // Ждём готовую выжимку с концептами в блоке «Новое для вас».
+  const markButtons = page.locator('button.summary-concept-mark-known')
+  await expect(markButtons.first()).toBeVisible({ timeout: 30000 })
+  const before = await markButtons.count()
+  console.log(`  новых концептов: ${before}`)
+  await shot(page, 'new-concepts')
+  if (before === 0) {
+    console.log('  нет новых концептов (всё уже изучено) — skip демо кнопок')
+    test.skip()
+    return
+  }
+
+  // Клик «Изучено» на первом концепте — оптимистично уходит из «нового».
+  await markButtons.first().click()
+  await expect(markButtons).toHaveCount(before - 1)
+  console.log('  концепт помечен изученным (ушёл из «нового»)')
+  await shot(page, 'marked-known')
+
+  // «Очистить базу знаний» — confirm авто-accept; после мягкого сброса все снова «новые».
+  page.once('dialog', (d) => d.accept())
+  await page.getByRole('button', { name: 'Очистить базу знаний' }).click()
+  await expect(markButtons).toHaveCount(before, { timeout: 15000 })
+  console.log('  база знаний очищена — все концепты снова «новые»')
+  await shot(page, 'knowledge-reset')
+})

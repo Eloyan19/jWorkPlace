@@ -3,8 +3,10 @@
 `GET .../summary` — lazy-генерация: если сохранённая выжимка устарела (head_sha разошёлся с
 `projects.head_sha` после reindex) или её ещё нет, ставит фоновую генерацию под guard'ом и
 отдаёт `{"status": "generating"}` — фронт поллит. `POST .../read` — авто-пометка известных
-концептов при открытии панели выжимки (идемпотентно). `GET /concepts` — глобальный каталог
-«что я знаю» (опциональная панель).
+концептов при открытии панели выжимки (идемпотентно, оставлена как есть для обратной
+совместимости — фронт больше не обязан её звать). `POST /concepts/{slug}/known` — ручная
+пометка ОДНОГО концепта. `POST /concepts/reset` — мягкий сброс known по всему каталогу (строки
+и связи не удаляются). `GET /concepts` — глобальный каталог «что я знаю» (опциональная панель).
 
 Генерация — 1 вызов LLM + немного embed_query (лёгкая операция), НЕ участвует в
 `Semaphore(1)` пайплайна индексации — не блокируем реиндексацию других проектов. KB строго
@@ -85,6 +87,24 @@ async def mark_read(project_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Проект не найден.")
     await asyncio.to_thread(db.mark_concepts_known, project_id)
     return {"ok": True}
+
+
+@router.post("/concepts/{slug}/known")
+async def mark_concept_known(slug: str) -> dict:
+    """Ручная пометка ОДНОГО концепта известным (альтернатива авто-`/read` для всего проекта
+    сразу) — фронт зовёт по клику на конкретный концепт в списке «новых»."""
+    found = await asyncio.to_thread(db.mark_concept_known, slug)
+    if not found:
+        raise HTTPException(status_code=404, detail="Концепт не найден.")
+    return {"ok": True}
+
+
+@router.post("/concepts/reset")
+async def reset_known_concepts() -> dict:
+    """Мягкий сброс: снять known со всего каталога (строки/связи не удаляются) — «начать
+    изучение заново»."""
+    reset = await asyncio.to_thread(db.reset_known_catalog)
+    return {"ok": True, "reset": reset}
 
 
 @router.get("/concepts")
