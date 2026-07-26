@@ -5,9 +5,11 @@ import type {
   ChatResponse,
   EditResponse,
   Health,
+  KnownConcept,
   PrResponse,
   Project,
   ProjectStructure,
+  ProjectSummary,
   SearchResponse,
   SupportResponse,
 } from './types'
@@ -269,4 +271,37 @@ export async function createPr(
   }
   const data = (await res.json()) as PrResponse
   return { status: res.status, ...data }
+}
+
+// База знаний (выжимка о проекте): generating/error/ready — доменные статусы в теле 200, не
+// транспортные ошибки. Транспортную ошибку (сеть/5xx/404 нет проекта) бросаем как везде.
+export async function getSummary(projectId: string): Promise<ProjectSummary> {
+  const res = await fetch(`/api/knowledge/projects/${projectId}/summary`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as ProjectSummary
+}
+
+// Пометить концепты выжимки известными («прочитал → знаю»). Идемпотентно на backend.
+export async function markSummaryRead(projectId: string): Promise<{ ok: true }> {
+  const res = await fetch(`/api/knowledge/projects/${projectId}/read`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { ok: true }
+}
+
+// Глобальный каталог «что я уже знаю» (опциональная панель, не привязана к проекту).
+export async function getConcepts(): Promise<KnownConcept[]> {
+  const res = await fetch('/api/knowledge/concepts', { headers: authHeaders() })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as KnownConcept[]
 }

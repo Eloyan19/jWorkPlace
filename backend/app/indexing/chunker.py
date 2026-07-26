@@ -17,7 +17,10 @@ _SYMBOL_NODE_TYPES = {
     "interface_declaration", "type_alias_declaration", "arrow_function",
     "lexical_declaration", "export_statement", "module", "constructor_declaration",
 }
-_MAX_CHUNK_LINES = 120          # символ длиннее — режем окнами
+# Публичная константа (без `_`): переиспользуется в app/api/review.py как единый источник правды
+# для бюджета RAG-контекста в промпте ревью (_RAG_CONTEXT_CEILING_CHARS). Меняешь это число — там
+# пересчитается сам (см. assert рядом с _DIFF_LIMIT в review.py).
+MAX_CHUNK_LINES = 120           # символ длиннее — режем окнами
 _WINDOW_LINES = 60              # fallback-окно
 _OVERLAP_LINES = 15
 
@@ -77,7 +80,7 @@ def _chunk_treesitter(path, lang, grammar, source, lines) -> list[Chunk]:
         end = node.end_point[0] + 1
         symbol = _node_symbol(node, source_bytes)
         body = "\n".join(lines[start - 1:end])
-        if end - start + 1 > _MAX_CHUNK_LINES:
+        if end - start + 1 > MAX_CHUNK_LINES:
             chunks.extend(_split_window(path, lang, symbol, node.type, lines, start, end))
         else:
             chunks.append(Chunk(path, lang, symbol, node.type, start, end, body))

@@ -6,12 +6,14 @@ import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
 import SearchPanel from './components/SearchPanel'
 import StructurePanel from './components/StructurePanel'
+import SummaryPanel from './components/SummaryPanel'
 import SupportPanel from './components/SupportPanel'
 
-type Tab = 'chat' | 'structure' | 'search' | 'edits' | 'support'
+type Tab = 'chat' | 'summary' | 'structure' | 'search' | 'edits' | 'support'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'chat', label: 'Чат' },
+  { key: 'summary', label: 'О проекте' },
   { key: 'structure', label: 'Структура' },
   { key: 'search', label: 'Поиск' },
   { key: 'edits', label: 'Правки' },
@@ -50,6 +52,9 @@ function App() {
             состояние (история чата, результаты поиска, превью правки) при переключении вкладок. */}
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'chat'}>
           <ChatPanel />
+        </div>
+        <div className="tab-pane" role="tabpanel" hidden={tab !== 'summary'}>
+          <SummaryPanel active={tab === 'summary'} />
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'structure'}>
           <StructurePanel />

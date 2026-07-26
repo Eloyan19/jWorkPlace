@@ -36,6 +36,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          # SHA head-коммита PR — помечаем каждый комментарий-ревью, к какому состоянию относится.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Недоверенные данные — только через env (защита от script injection).
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -50,13 +52,21 @@ jobs:
             exit 0
           fi
 
-          # diff: усекаем до лимита backend (~100 KB), чтобы огромный PR не ловил 422. iconv -c
-          # отбрасывает битый UTF-8-хвост (head -c мог разрезать многобайтный символ) — иначе
-          # jq --rawfile упадёт на невалидном UTF-8 и уронит весь шаг.
+          # diff шлём ЦЕЛИКОМ — усечение (если нужно) делает backend (см. _DIFF_LIMIT в
+          # app/api/review.py) и честно помечает это в markdown-комментарии. Здесь только
+          # аварийный потолок против гигантских бинарных дампов/degenerate-diff (НЕ бюджет LLM —
+          # 2 МБ, совпадает с _REQUEST_MAX_DIFF_LEN на backend), плюс санитайз UTF-8.
+          # iconv -c отбрасывает битый UTF-8-хвост (head -c мог разрезать многобайтный символ) —
+          # иначе jq --rawfile упадёт на невалидном UTF-8 и уронит весь шаг.
+          # ВАЖНО: head и iconv — РАЗДЕЛЬНО, а не в пайпе. Если head -c режет посреди многобайтного
+          # символа, iconv пишет валидный префикс, но возвращает НЕНУЛЕВОЙ код («incomplete character
+          # at end of buffer») — под `bash -e` это роняло весь шаг на больших PR (см. PR #6). `|| true`
+          # + stderr в /dev/null: оставляем валидный префикс, не падаем на усечённом хвосте.
           # `--repo` обязателен: без него gh pr diff/view лезут в локальный git (которого на
           # раннере нет — мы не делаем checkout), а с --repo идут через API. Быстрее и без checkout.
           gh pr diff "$PR_NUMBER" --repo "$REPO" > diff.raw || { echo "::warning::gh pr diff не удался"; exit 0; }
-          head -c 100000 diff.raw | iconv -f UTF-8 -t UTF-8 -c > diff.txt
+          head -c 2000000 diff.raw > diff.cut
+          iconv -f UTF-8 -t UTF-8 -c < diff.cut > diff.txt 2>/dev/null || true
 
           # Изменённые файлы — массивом путей.
           gh pr view "$PR_NUMBER" --repo "$REPO" --json files --jq '[.files[].path]' > files.json
@@ -90,16 +100,13 @@ jobs:
             exit 0
           fi
 
-          # Обновляем ОДИН комментарий по скрытому маркеру (иначе на synchronize плодятся дубли).
-          MARKER='<!-- jworkplace-ai-review -->'
-          COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq "map(select(.body | contains(\"${MARKER}\"))) | last | .id // empty")
-
-          if [ -n "${COMMENT_ID:-}" ]; then
-            gh api --method PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" \
-              -F body=@review.md >/dev/null
-            echo "Комментарий ревью обновлён (id=${COMMENT_ID})."
-          else
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file review.md
-            echo "Комментарий ревью создан."
-          fi
+          # Каждый прогон — НОВЫЙ комментарий (по запросу: в PR видна эволюция ревью «до/после»
+          # изменений, а не перезапись одного). Помечаем шапкой с коммитом, к которому относится
+          # ревью, — иначе неотличимо, какое ревью к какому состоянию PR. Скрытый маркер от backend
+          # остаётся в теле (безвреден); поиск/PATCH существующего убран намеренно.
+          {
+            printf '> 🔄 Авто-ревью коммита `%s` · %s UTC\n\n' "${HEAD_SHA:0:7}" "$(date -u '+%Y-%m-%d %H:%M')"
+            cat review.md
+          } > comment.md
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file comment.md
+          echo "Комментарий ревью создан (коммит ${HEAD_SHA:0:7})."

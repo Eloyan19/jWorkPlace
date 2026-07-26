@@ -79,6 +79,36 @@ CREATE TABLE IF NOT EXISTS embed_cache (
 CREATE INDEX IF NOT EXISTS idx_chunks_project_faiss ON chunks(project_id, faiss_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_blob ON chunks(blob_sha);
 CREATE INDEX IF NOT EXISTS idx_files_project_blob ON files(project_id, blob_sha);
+
+CREATE TABLE IF NOT EXISTS project_summaries (
+    project_id   TEXT PRIMARY KEY,
+    head_sha     TEXT NOT NULL,
+    overview     TEXT NOT NULL,
+    tech         TEXT NOT NULL,
+    generated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS concepts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug          TEXT NOT NULL UNIQUE,
+    name          TEXT NOT NULL,
+    category      TEXT NOT NULL,
+    description   TEXT NOT NULL,
+    embedding     BLOB,
+    known         INTEGER NOT NULL DEFAULT 0,
+    first_project TEXT,
+    known_at      TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS project_concepts (
+    project_id  TEXT NOT NULL,
+    concept_id  INTEGER NOT NULL,
+    detail      TEXT NOT NULL,
+    evidence    TEXT,
+    PRIMARY KEY (project_id, concept_id)
+);
+CREATE INDEX IF NOT EXISTS idx_project_concepts_concept ON project_concepts(concept_id);
 """
 
 
@@ -213,12 +243,16 @@ def project_can_edit(project_id: str) -> bool:
 
 
 def delete_project(project_id: str) -> None:
-    """Удалить проект и его метаданные (projects + files + chunks) одной транзакцией. embed_cache
-    НЕ трогаем — он глобальный (dedup эмбеддингов по blob_sha между проектами/форками). FTS-таблицу
-    и FAISS-индекс чистит вызывающий (drop_fts, faiss_store.delete_index)."""
+    """Удалить проект и его метаданные (projects + files + chunks + summaries/project_concepts)
+    одной транзакцией. embed_cache НЕ трогаем — он глобальный (dedup эмбеддингов по blob_sha между
+    проектами/форками). Глобальный каталог `concepts` тоже НЕ трогаем — обучение персистентно
+    (решение architect); `first_project` при этом может «повиснуть» на удалённый проект, это ок.
+    FTS-таблицу и FAISS-индекс чистит вызывающий (drop_fts, faiss_store.delete_index)."""
     with get_conn() as conn:
         conn.execute("DELETE FROM chunks WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM files WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM project_summaries WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM project_concepts WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
 
 
@@ -442,3 +476,102 @@ def chunks_by_faiss_ids(project_id: str, faiss_ids: list[int]) -> dict[int, sqli
             (project_id, *faiss_ids),
         ).fetchall()
         return {r["faiss_id"]: r for r in rows}
+
+
+# --- база знаний: выжимка проекта + глобальный каталог концептов (учебная персонализация) ---
+
+
+def save_summary(project_id: str, head_sha: str, overview: str, tech_json: str) -> None:
+    """Сохранить/перезаписать выжимку проекта. head_sha — инвалидатор кэша: перегенерация нужна,
+    когда `projects.head_sha` (после reindex) разошёлся с сохранённым здесь."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO project_summaries (project_id, head_sha, overview, tech) "
+            "VALUES (?, ?, ?, ?)",
+            (project_id, head_sha, overview, tech_json),
+        )
+
+
+def get_summary(project_id: str) -> Optional[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM project_summaries WHERE project_id = ?", (project_id,)
+        ).fetchone()
+
+
+def catalog_concepts() -> list[sqlite3.Row]:
+    """Весь глобальный каталог концептов — материал для каскада дедупа (matching.py)."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT id, slug, name, description, known, embedding FROM concepts"
+        ).fetchall()
+
+
+def get_concept_by_slug(slug: str) -> Optional[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM concepts WHERE slug = ?", (slug,)).fetchone()
+
+
+def insert_concept(
+    slug: str, name: str, category: str, description: str, embedding: Optional[bytes], first_project: str
+) -> int:
+    """Вставить новый концепт в глобальный каталог; если slug уже занят (гонка/повтор) — НЕ
+    трогаем существующую строку (в т.ч. known/known_at), просто возвращаем её id."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO concepts (slug, name, category, description, embedding, first_project) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(slug) DO NOTHING",
+            (slug, name, category, description, embedding, first_project),
+        )
+        row = conn.execute("SELECT id FROM concepts WHERE slug = ?", (slug,)).fetchone()
+        return row["id"]
+
+
+def link_project_concept(project_id: str, concept_id: int, detail: str, evidence_json: Optional[str]) -> None:
+    """Связать концепт с проектом + его project-scoped раскрытие (`detail`). Идемпотентно
+    (INSERT OR REPLACE) — повторная генерация выжимки перезаписывает связь."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO project_concepts (project_id, concept_id, detail, evidence) "
+            "VALUES (?, ?, ?, ?)",
+            (project_id, concept_id, detail, evidence_json),
+        )
+
+
+def clear_project_concepts(project_id: str) -> None:
+    """Снести старые связи проекта перед перегенерацией выжимки (сами `concepts` не трогаем)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM project_concepts WHERE project_id = ?", (project_id,))
+
+
+def get_project_concepts(project_id: str) -> list[sqlite3.Row]:
+    """Концепты проекта + их project-scoped раскрытие, джойном на глобальный каталог."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT pc.concept_id AS concept_id, c.name AS name, c.category AS category, "
+            "c.description AS description, c.known AS known, pc.detail AS detail, "
+            "pc.evidence AS evidence "
+            "FROM project_concepts pc JOIN concepts c ON c.id = pc.concept_id "
+            "WHERE pc.project_id = ?",
+            (project_id,),
+        ).fetchall()
+
+
+def mark_concepts_known(project_id: str) -> None:
+    """Пометить все концепты этого проекта известными (авто при открытии панели выжимки).
+    Идемпотентно: уже известные (known=1) не трогает `known_at`."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE concepts SET known = 1, known_at = COALESCE(known_at, datetime('now')) "
+            "WHERE known = 0 AND id IN (SELECT concept_id FROM project_concepts WHERE project_id = ?)",
+            (project_id,),
+        )
+
+
+def list_known_concepts() -> list[sqlite3.Row]:
+    """Глобальный каталог «что я уже знаю» — для опциональной панели."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT slug, name, category, description, known_at FROM concepts "
+            "WHERE known = 1 ORDER BY known_at"
+        ).fetchall()

@@ -4,8 +4,9 @@
 в конструкторе и попадает **только** в заголовок Authorization — никогда в query-параметры,
 логи или исключения (см. CLAUDE.md «Безопасность и секреты»).
 
-Модель — фиксированно `deepseek-chat`: `deepseek-reasoner`/thinking-mode несовместим с
-tools/JSON-режимом (используется ролью-роем и grounded-генерацией на Этапе 2b/4).
+Модель — из Settings (`DEEPSEEK_MODEL`, дефолт `deepseek-v4-flash`, env-переопределяемо: провайдер
+ретайрит имена, июль 2026 — `deepseek-chat` снят). Дефолт — non-thinking-вариант: thinking-mode
+(`deepseek-v4-pro`) несовместим с tools/JSON-режимом (используется ролью-роем и grounded-генерацией).
 """
 import logging
 
@@ -17,7 +18,6 @@ from app.llm.base import LlmService
 logger = logging.getLogger("jworkplace.llm")
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
 
 # connect=10s (быстро отличить недоступность сети от медленной генерации), общий потолок 60s.
 _TIMEOUT = httpx.Timeout(60.0, connect=10.0)
@@ -34,6 +34,7 @@ class LlmError(Exception):
 class DeepSeekLlmService(LlmService):
     def __init__(self, settings: Settings) -> None:
         self._api_key = settings.deepseek_api_key
+        self._model = settings.deepseek_model
 
     async def chat(
         self,
@@ -95,7 +96,7 @@ class DeepSeekLlmService(LlmService):
         tool_choice: str | dict = "auto",
     ) -> tuple[dict, str | None]:
         payload: dict = {
-            "model": DEEPSEEK_MODEL,
+            "model": self._model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,

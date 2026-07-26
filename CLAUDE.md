@@ -3,105 +3,16 @@
 > **🗣 Язык общения — всегда русский.** Весь прозаический текст (анализ, планы, вопросы,
 > объяснения) — на русском. Имена кода, команды, идентификаторы — латиницей.
 
-> ✅ **Стадия: Этап 3c задеплоен — AI-ревью PR (GitHub Action → backend RAG+DeepSeek → комментарий).**
-> До него: Этап 3b (реальный PR через per-project PAT). Ручные проверки (реальный PR 3b; тестовый PR с
-> AI-ревью 3c) — за пользователем (нужны PAT/secrets). Готово: `CLAUDE.md`
-> (правила/инварианты/агенты), **`PLAN.md`** (поэтапный deploy-first роадмап — **прочитай его перед
-> работой над реализацией**), 11 агентов Слоя A, публичный репо `Eloyan19/jWorkPlace`.
-> Этап 0: `backend/app/` (FastAPI, `/api/health`, `LlmService`-абстракция), фронт health-индикатор, деплой.
-> **Этап 1 (индексация):** `backend/app/indexing/` (validation SSRF-safe → безопасный clone →
-> scan+gitleaks → tree-sitter chunker → nomic-эмбеддинги+кэш → per-project FAISS), `db.py` (SQLite
-> projects/files/chunks/embed_cache), `api/projects.py` (POST/GET/reindex, фон через pipeline
-> state-machine), фронт `ProjectsPanel` (подключение/список/переключение), токен-гейт nginx на `/api/*`
-> (кроме health) + rate-limit, eval recall@k (baseline: файл 1.00, символ 0.80).
-> **Этап 2a (retrieval без LLM):** `indexing/lexical.py` (code_tokenize camelCase/snake/пути),
-> per-project FTS5 `fts_<pid>` в `db.py` (bm25 веса 1/5/2), `indexing/hybrid.py` (RRF k=60 dense+lex,
-> гейт abstain по сырым скорам: dense<0.62 И нет уверенного bm25≤−4, dense-only fallback),
-> `faiss_store` LRU-кэш, `api/search.py` (`POST /api/search`), фронт `SearchPanel` + `activeProject.ts`,
-> nginx `= /api/search`. Baseline: файл 1.00 / символ 0.80 / MRR 0.900; abstain позитивы 5/5, negatives 4/4.
-> **Этап 2b (grounded-генерация):** `llm/deepseek.py` (реальный httpx `deepseek-chat`, ключ только в
-> Authorization, retry на finish_reason=length, `LlmError` без repr/URL), `llm/base.py` (`chat` +
-> response_format/temperature), `chat/grounding.py` (`build_context` нонс-делимитеры + `SYSTEM_PROMPT`
-> anti-injection, `parse_and_validate` line-based цитаты по ФАЙЛУ на диске + traversal/project_id-guard,
-> `redact` второй барьер секретов), `api/chat.py` (`POST /api/chat`: retrieve → гейт should_abstain БЕЗ
-> LLM → генерация → валидация → downgrade в abstain при пустых/невалидных цитатах; коерция роли,
-> takeLast), `api/search.py` тоже через `redact`, фронт `ChatPanel` (пузыри + источники + abstain),
-> nginx `= /api/chat` (Bearer, timeout 180s). Прошли llm-engineer + security-auditor (аудит чист) +
-> `/code-review`. **Baseline grounded-точности:** cases 5/5 = 1.00 валидных line-based цитат, negatives
-> 4/4 abstain. 88 pytest + 18 vitest.
-> **Этап 3a (правка → предпросмотр diff, БЕЗ PR):** `chat/grounding.py` (вынесены `safe_repo_path` +
-> `read_span` — общий traversal-guard), `edit/patcher.py` (`EDIT_SYSTEM_PROMPT` anti-injection,
-> `build_edit_context` окна символов в нонс-делимитерах+redact, `parse_and_validate_edits` —
-> структурированные JSON-edits вместо unified diff от LLM: `file`∈hits, запрет `.git/`/`.github/workflows/`,
-> `old_block` УНИКАЛЕН+дословен в redacted-проекции файла, дедуп; `assemble_diff` — difflib+redact;
-> `check_apply` — `git apply --check` hardening-env), `api/edit.py` (`POST /api/projects/{id}/edit`:
-> retrieve→гейт should_abstain→генерация temp=0→валидация→сборка diff→--check; fail-closed `{ok:false}`;
-> instruction max_length=2000), фронт `EditPanel` (подсветка diff +/−, источники, заглушка кнопки PR
-> «Этап 3b»), nginx `~ ^/api/projects/[^/]+/edit$` (Bearer, timeout 180s), `eval/pr_quality.py`. Прошли
-> security-auditor + llm-engineer (Plan Mode-гейт) + `/code-review`. 102 pytest + 24 vitest.
-> **Прод живой (deploy cc52e55):** попросил правку → diff с источником `file::symbol::строки`,
-> `git apply --check` прошёл; off-topic → «не могу выполнить» без генерации; ключ не в логах.
-> **Прод живой:** вставил ссылку → `ready`; спросил по коду → grounded-ответ с источниками
-> `file::symbol::строки` + дословный quote; off-topic → «не знаю» без генерации. Секреты гейтятся до
-> эмбеддинга (fail-closed на gitleaks) и маскируются `redact` до LLM/клиента.
-> **Этап 3b (реальный PR через per-project fine-grained PAT):** `config.py` (`JWP_SECRET_KEY`+`fernet()`
-> fail-closed, `worktrees_dir`), `db.py` (`github_token_enc` BLOB + идемпотентная миграция, set/get/clear
-> token), `edit/github.py` (`validate_token` — push+full_name против репо ИМЕННО проекта; `encrypt/decrypt`
-> Fernet; `open_pr` — writable-клон в `worktrees/<pid>` БЕЗ blob:none → `git apply` → ветка
-> `jworkplace/<slug>` → bot-commit → push; токен git-у ТОЛЬКО через env `GIT_CONFIG_*` http.extraHeader,
-> `gh pr create` через `GH_TOKEN` env — никогда argv/URL/reflog; stderr+PR-body через `redact`),
-> `api/edit.py` (`generate_validated_edit` — единый серверный источник diff для `/edit` и `/pr`),
-> `api/projects.py` (`PUT/DELETE /token`; `POST /pr` — human-in-the-loop: confirm + **регенерация+сверка**
-> diff, 409 на расхождение, guard от гонки, fail-closed, `_project_dto` allowlist+`can_edit`). Фронт:
-> `ProjectsPanel` (поле PAT password, не в localStorage, бейдж can_edit), `EditPanel` (кнопка «Подтвердить
-> и открыть PR» с `expected_diff`, ссылка на PR, 409 «превью устарело»). nginx `~ .../(token|pr)$` (Bearer,
-> 300s), systemd `HOME=/root` (для `gh`). Прошли security-auditor (дизайн + аудит реализации — чисто) +
-> qa-engineer (43 pytest) + `/code-review` (3 находки: validate_token best-effort по scope, guard гонки
-> `/pr`, мёртвый `project_can_edit`). **145 pytest + 31 vitest.**
-> **Прод живой (deploy 594705a):** `GET /api/projects` отдаёт `can_edit`; `/pr` без confirm → 400;
-> nginx token|pr за Bearer (401 без); `PUT /token` невалидным токеном → 400 (валидация против GitHub);
-> тестовый токен не в логах; `HOME`/`gh` доступны процессу. **Ручная проверка реального PR — за
-> пользователем** (нужен fine-grained PAT + тестовый репо; инструкция выдана).
-> **Этап 3c (AI-ревью PR, dogfood):** `review/reviewer.py` (`parse_diff` без зависимостей → хунки
-> `D1..Dn`, `build_review_queries`, `retrieve_context` hybrid k=6 без `should_abstain`,
-> `REVIEW_SYSTEM_PROMPT` анти-инъекция БЕЗ approve-поля, двойной `redact` вход+выход, `render_markdown`
-> + маркер `<!-- jworkplace-ai-review -->`), `api/review.py` (`POST /api/projects/{id}/review`, лимит
-> diff→422, fail-closed без сырого diff в логах), `.github/workflows/ai-review.yml` (`pull_request` НЕ
-> `_target`, `permissions:{}`+job минимум, PR title/body через env против script-injection, форки
-> fail-closed, обновление ОДНОГО комментария по маркеру), nginx `~ .../review$` (Bearer, 180s),
-> `eval/review_quality.py`. Эксперты (llm+architect+security ПЕРВЫМИ) + аудит реализации (чисто) + qa
-> (32 pytest) + `/code-review`. **177 pytest.** Прод (deploy 07b5d6b): `/review` за Bearer, 422 на большой
-> diff, `[REDACTED]` на секрет, «approve»-инъекция не проходит. **Dogfood ПРОШЁЛ (fix `711b898`):**
-> тестовый PR #1 → Action → AI-комментарий с реальными багами + ссылками на RAG-контекст проекта.
-> Урок CI: `gh pr diff/view/comment` без `actions/checkout` → нужен `--repo "$REPO"` (иначе «not a git
-> repository»). Секреты репо заданы. Запушено в origin (`workflow` scope добавлен в gh).
-> **Доработка (deploy `c80bc70`): управление репо** — у `ready`-проекта в UI три действия: Обновить
-> (инкрементальный `/reindex`), Переиндексировать заново (`POST /{id}/rebuild` → `clone_repo` с нуля),
-> Удалить (`DELETE /{id}` → чистит БД/FTS/FAISS/клоны; `embed_cache` глобальный не трогаем;
-> `_safe_project_dir` guard + `_pr_in_flight` gate). 200 pytest + 39 vitest.
-> **Учебные задания 1–3 (MVP поверх фундамента, не задеплоено):**
-> **Зад.1 (`/help` + структура):** `db.project_tree` (дерево files+символы из chunks, БЕЗ LLM/обхода
-> клона), `api/structure.py` (`GET /api/projects/{id}/structure`), фронт `StructurePanel` + команда
-> `/help` в чате (статический ответ на фронте, В ОБХОД abstain-гейта — мета-вопрос о продукте).
-> **Зад.2 (поддержка + РЕАЛЬНЫЙ MCP):** `support/corpus.py` (FAQ-корпус `docs/faq.md` → отдельный
-> мини-FAISS `__support__`, БЕЗ per-project пайплайна), `support/qa.py` (grounded по FAQ через
-> `chat/grounding`, тикет из MCP — недоверенные данные в делимитерах+`redact`, гейт эскалации,
-> retrieve в to_thread), `mcp_servers/tickets_server.py` (FastMCP **stdio** read-only
-> `get_ticket`/`list_tickets(user_id обязателен)`/`get_user` над JSON), `support/mcp_client.py`
-> (backend как MCP-клиент, allowlist id, semaphore≤2, fail-closed), `api/support.py`
-> (`POST /api/support/ask`), фронт вкладка `SupportPanel`. Прошёл security-auditor (критичных нет).
-> **Зад.3 (файловый tool-агент = MVP Слоя B, ОДИН агент):** `llm/base.py`+`deepseek.py` (`chat_raw`
-> function-calling: tools/tool_choice, возврат {content,tool_calls,finish_reason}), `agent/tools.py`
-> (schemas + исполнители search_code/read_file/list_files/propose_patch/write_file[только новые .md]/
-> finish; guard'ы на каждый вход, `redact` каждого результата), `agent/loop.py` (tool-loop ≤8 итер,
-> дедуп, fail-closed), `patcher.new_file_diff`/`assemble_full_diff` (новые файлы в общий diff),
-> `api/agent.py` (`POST /api/projects/{id}/agent`: прогон → превью; confirm по `run_id` +
-> перепроверка `check_apply` → `open_pr`, паттерн /pr), фронт `AgentPanel`. Эксперты llm+security
-> ПЕРВЫМИ. **233 pytest + 51 vitest.**
-> **Этап 4 (мультиролевой рой Слоя B) — ⏸ ОТЛОЖЕН (решение 2026-07-20).** Одиночный tool-агент
-> (Зад.3) — это MVP-вход в Слой B; мультиролевой рой (planner/critic/coder/reviewer/judge)
-> надстраивается позже над тем же `agent/tools.py`. Дизайн роя сохранён в `PLAN.md`/`## Слой B`.
-> Принятые/открытые решения — в разделе `## Решения`; открытые не выдумывай молча, спрашивай.
+> ✅ **Текущее состояние:** MVP поверх фундамента. Задеплоено до Этапа 3c (AI-ревью PR) + управление
+> репо (`c80bc70`). Учебные задания 1–3 (`/help`+структура, поддержка+MCP, файловый tool-агент = MVP
+> Слоя B) реализованы, НЕ задеплоены. Этап 4 (мультиролевой рой) — ⏸ отложен. Тесты: ~233 pytest +
+> 51 vitest. **Поэтапная история и deploy-хеши — в [`CHANGELOG.md`](./CHANGELOG.md); роадмап — в
+> [`PLAN.md`](./PLAN.md)** (прочитай перед работой над реализацией).
+
+**Как читать этот файл.** Это **L2** (проект) в иерархии правил: глобальный каркас работы
+оркестратора — в `~/.claude/CLAUDE.md` (**L0**), среда VPS и карта проектов — в `~/repos/CLAUDE.md`
+(**L1**), построчные конвенции стека — в `backend/CLAUDE.md` и `frontend/CLAUDE.md` (**L3**). Здесь —
+инварианты продукта, стек, архитектура и **конкретные профили оркестратора** с реальными агентами.
 
 ---
 
@@ -137,37 +48,49 @@ Pull Request**. При подключении к проекту сам серв�
 - ❌ **Запуск чужого кода** (сборка, тесты, run) — не исполняем ничего из склонированного репо.
 - ❌ **Docker-изоляция** — пока не вводим (см. `## Клонирование и изоляция`).
 - ❌ Полноценный выбор моделей в UI (абстракция есть, UI-переключатель — позже).
-- ❌ Мультипользовательность/шаринг проектов — уточняется (`## Открытые решения`).
+- ❌ Мультипользовательность/шаринг проектов — уточняется (`## Решения`).
 
 **Фазы дальше:** фаза 2 — исполнение кода (тесты/сборка) за изоляцией; фаза 3 — выбор моделей;
 фаза 4 — многопользовательский режим/шаринг.
 
 ---
 
-## Среда и соседи (VPS jorchik.com)
+## Среда и границы
 
-- Claude Code запущен **на самом проде — VPS jorchik.com** (тот же хост, что обслуживает `jorchik.com`,
-  `llm.jorchik.com` и соседей; IPv4 `202.71.13.114`). Поэтому **деплой = локальные операции прямо здесь**
-  (правим systemd/nginx/certbot на этой машине), **не по SSH**.
-- **RAM 3.8 ГБ** → локальные Ollama-модели **≤3B**; тяжёлое — облачный API. **Ollama на `:11434`**,
-  модель `nomic-embed-text` для эмбеддингов уже установлена (есть и `qwen2.5:3b`, `qwen2.5-coder:3b`).
-- Деплой — паттерн соседей: **systemd + nginx + certbot**, секреты в env/`.env`. Порт `:8200` свободен.
-- **Соседние репозитории (свои git/origin/CLAUDE.md — через границу код не тащим):**
+**Среда VPS (RAM 3.8 ГБ → Ollama ≤3B, деплой = локальные операции systemd+nginx+certbot, секреты в
+env, Ollama :11434) — общая, см. `~/repos/CLAUDE.md`.** Специфика проекта: backend порт **`:8200`**,
+домен **`jwork.jorchik.com`**, data-dir **`$JWP_DATA_DIR`** (клоны + индексы, вне git), systemd-цепочка
+`jworkplace.service → Wants/After ollama.service`, origin `Eloyan19/jWorkPlace` (публичный; Secret
+Scanning + Push Protection — фейковые «секреты» в тестах держим синтетическими, не формата провайдеров).
+
+**Соседние репозитории (свои git/origin/CLAUDE.md — через границу код не тащим):**
 
 | Каталог | Что | Как относимся |
 |---|---|---|
 | `../rag/` | RAG-пайплайн retrieval (`:8100`), FAISS + Ollama | Референс паттернов чанкинга/эмбеддинга/eval. Свой индексатор пишем **у себя**, но `nomic-embed :11434` переиспользуем. Контракт `rag/` **не меняем**. |
-| `../webchat/` | Веб-чат DeepSeek + RAG + grounding (`:8000`) | **Главный референс стека и grounding-инвариантов.** Переносим паттерн: браузер→backend→LLM, JSON-grounded ответ, валидация цитат, гейт «не знаю». |
+| `../webchat/` | Веб-чат DeepSeek + RAG + grounding (`:8000`) | **Главный референс стека и grounding-инвариантов.** Паттерн: браузер→backend→LLM, JSON-grounded ответ, валидация цитат, гейт «не знаю». |
 | `../webchat_with_local_llm/` | Тот же UI на локальной LLM | Референс провайдер-абстракции LLM. |
-| `../AI_Challenge_2_3_4_5/` | Android, ⏸ разработка приостановлена | ⏸ **Не трогать и не менять.** **Примерный** read-only-референс — понять, что flow роя существует, **не для копирования логики**. Смотреть **только если пользователь явно попросит**; иначе не заходить. |
+| `../AI_Challenge_2_3_4_5/` | Android, ⏸ разработка приостановлена | ⏸ **Не трогать и не менять.** **Примерный** read-only-референс — понять, что flow роя существует, **не для копирования логики**. Смотреть **только если пользователь явно попросит**. |
 
 ---
 
-## Стек и рантайм-топология (план)
+## Стек
 
-**Стек** (переиспользуем связку `webchat`): **TypeScript · React · Vite** (фронт) ·
-**Python · FastAPI · httpx** (backend) · **FAISS + Ollama nomic-embed** (индексатор) ·
-**SQLite** (метаданные проектов + история чата) · **GitPython/`git` CLI + `gh`/GitHub API** (клон и PR).
+- **Backend:** Python · FastAPI · uvicorn · httpx · pydantic-settings. Индексация: **tree-sitter**
+  (+ `tree_sitter_language_pack`, ABI-пины; cpp намеренно в line-based fallback) · **faiss-cpu** · numpy
+  · **Ollama `nomic-embed-text`** (:11434, общий, ≤3B). Хранилище: **SQLite** (raw `sqlite3`, без ORM)
+  + **FTS5** per-project. Секреты at rest: `cryptography`/Fernet. MCP: пакет `mcp` (stdio-сервер тикетов).
+- **Frontend:** TypeScript · React 19 · Vite 8 · Vitest 4 (+ testing-library). Без роутера, без
+  state-библиотек (состояние — `useState` + localStorage/CustomEvent).
+- **LLM:** DeepSeek (`deepseek-chat`) за провайдер-абстракцией `LlmService` (`llm/base.py`).
+- **Границы:** браузер → только свой backend (`:8200`) → LLM/GitHub/Ollama. Индексатор пишем у себя,
+  эмбеддинги через общий Ollama. Контракт соседнего `rag/` (:8100) не трогаем.
+
+Пины версий (`tree_sitter`/`faiss`/`numpy`/`cryptography`/`mcp`) — обязательны (ABI-рассинхрон).
+
+---
+
+## Архитектура и потоки данных
 
 ```
 Браузер ──HTTPS──▶ nginx (jwork.jorchik.com:443)
@@ -178,13 +101,74 @@ Pull Request**. При подключении к проекту сам серв�
                                                ├─ Data dir  $JWP_DATA_DIR (клоны + индексы, вне git)
                                                └─ GitHub (clone / push / PR)  — токен из env
 ```
-- **Порт backend: `:8200`** (предложение; `:8000` занят webchat, `:8100` — rag, `:11434` — Ollama).
-- **systemd-цепочка:** `jworkplace.service` → `Wants/After ollama.service`.
-- **Домен:** `jwork.jorchik.com` — поддомен `jorchik.com` (паттерн как `llm.jorchik.com`). **Уже
-  резолвится** на IP машины (`202.71.13.114`, wildcard `*.jorchik.com`) — отдельная A-запись не нужна;
-  на деплое остаётся nginx `server_name` + `certbot --nginx -d jwork.jorchik.com`.
-- **Repo:** origin `Eloyan19/jWorkPlace` (публичный; Secret Scanning + Push Protection включены —
-  фейковые «секреты» в тестах держим синтетическими, не формата провайдеров), ветка `master`.
+
+**Слои backend (`backend/app/`):**
+- `api/*` — тонкие FastAPI-роутеры (один `APIRouter(prefix="/api/…")`, Pydantic-DTO в модуле роутера).
+  Типовая оркестрация эндпоинта: `retrieve → гейт → LLM → валидация → fail-closed`.
+- `indexing/` — свой индексатор: `validation`(SSRF) → `clone` → `scan`(gitleaks) → `chunker`(tree-sitter)
+  → `embeddings`(Ollama+кэш) → `faiss_store`(LRU) + `lexical`/`hybrid`(RRF+abstain). Оркестратор —
+  `pipeline.py` (state-machine `cloning→scanning→indexing→ready/error`, `Semaphore(1)` под потолок RAM,
+  блокирующее — в `to_thread`).
+- `chat/` — grounding: `build_context` (нонс-делимитеры + anti-injection) / `parse_and_validate`
+  (line-based цитаты по файлу на диске) / `redact` / `safe_repo_path` / `read_span`.
+- `edit/` — `patcher` (структурированные JSON-edits → difflib → `git apply --check`) + `github`
+  (Fernet-токен, писабельный клон в `worktrees/`, `gh pr create` через env).
+- `agent/` — MVP Слоя B: `tools.py` (схемы+исполнители, `redact` на каждый выход) + `loop.py`
+  (function-calling tool-loop ≤8 итер).
+- `review/` — AI-ревью PR (`parse_diff → retrieve → LLM → render_markdown`), под GitHub Action.
+- `support/` — ассистент поддержки: отдельный мини-FAISS FAQ + MCP-клиент к `tickets_server`.
+- `llm/` — `LlmService` (`base`) + DeepSeek-адаптер (`chat` / `chat_raw` / `complete`).
+- `db.py` — SQLite: projects/files/chunks/embed_cache + FTS5 `fts_<pid>`; `STATUS_*`-константы =
+  единый источник статусов для backend и (через API) фронта.
+- `config.py` — `Settings`(pydantic-settings) + `get_settings()`(lru_cache) + `fernet()`; все пути —
+  производные `@property` от `$JWP_DATA_DIR`.
+- `main.py` — `create_app()`: `include_router` всех `api/*`, CORS только при заданных origin.
+
+**Поток типового запроса:** фронт `api.ts` (относительный `/api/*`) → nginx (Bearer) → роутер `api/*`
+→ проверка проекта/статуса в `db` → `hybrid.hybrid_search` (в `to_thread`) → `should_abstain` (гейт
+**БЕЗ** LLM) → `grounding.build_context` → `llm.chat` → `parse_and_validate` → `redact` → JSON клиенту.
+Данные вне git: `$JWP_DATA_DIR` (клоны `repos/`, индексы `indexes/`, `worktrees/`, `jworkplace.sqlite`).
+
+---
+
+## Структура папок
+
+```
+backend/
+  app/{api,indexing,chat,edit,agent,review,support,llm}/   — см. Архитектуру
+  app/{config,db,main,version}.py
+  mcp_servers/tickets_server.py    — отдельный stdio MCP-процесс (read-only тикеты)
+  tests/test_<module>.py           — pytest, зеркалят модули app/
+  .env / .env.example / requirements.txt
+  CLAUDE.md                        — L3: построчные конвенции Python/FastAPI
+frontend/src/
+  api.ts            — ВСЕ fetch-обёртки (относительные URL, authHeaders, readErrorMessage)
+  types.ts          — ВСЕ разделяемые типы/DTO (дискриминированный union по полю ok)
+  activeProject.ts  — кросс-панельный «активный проект» (localStorage + CustomEvent)
+  App.tsx           — вкладки (панели остаются mounted, неактивные hidden — не теряют состояние)
+  components/*Panel.tsx            — по панели на фичу
+  __tests__/*.test.tsx             — vitest + testing-library
+  ../CLAUDE.md                     — L3: построчные конвенции TS/React
+deploy/    — jworkplace.service, nginx-*.conf, redeploy.sh
+eval/      — recall_at_k / grounded_accuracy / pr_quality / review_quality + golden_*.json
+CLAUDE.md (этот файл) · CHANGELOG.md (история) · PLAN.md (роадмап) · README.md
+```
+
+---
+
+## Паттерны (кросс-стековые; построчные — в L3 `backend/` и `frontend/`)
+
+- **Fail-closed везде:** нет источников / невалидные цитаты / нет токена → предзаданный отказ
+  (`abstain`, `{ok:false}`), не 500 и не откат на знания модели.
+- **Гейт ДО LLM:** `should_abstain` по сырым скорам — генерацию не вызываем впустую (стоимость + галлюцинации).
+- **Секреты — двойной барьер:** gitleaks до эмбеддинга + `redact` до любого выхода (LLM/клиент/лог).
+- **Недоверенный вход** (контент репо, MCP-тикет, PR-title) — всегда в нонс-делимитерах + anti-injection
+  в system-промпте; роли не меняют цель от текста данных.
+- **Human-in-the-loop на запись:** PR только после confirm + серверная регенерация+сверка diff
+  (409 на расхождение). Клиенту не доверяем — сверяем со своей свежей сборкой.
+- **Блокирующее** (git/embed/faiss/поиск) → `asyncio.to_thread`; тяжёлое сериализовано `Semaphore(1)`.
+- **LLM только через `LlmService`** — никакой DeepSeek-специфики вне `llm/deepseek.py`.
+- **Контракт `rag/` (:8100) и общий Ollama — не трогаем;** индексатор — свой.
 
 ---
 
@@ -253,18 +237,16 @@ Pull Request**. При подключении к проекту сам серв�
 Оптимальный для нашего случая вариант **без Docker и без исполнения кода**:
 
 1. **Клон:** `git clone --depth 1 --filter=blob:none -c core.hooksPath=/dev/null` в
-   `$JWP_DATA_DIR/repos/<project-id>/` (data dir **вне** git-дерева jWorkPlace, напр. `/var/lib/jworkplace/`).
-   Shallow — экономим диск/RAM (на VPS 7 ГБ свободно). Большие/бинарные файлы фильтруем на этапе индексации.
-   Оговорка: `--filter=blob:none` тянет блобы лениво и ломает `git blame/log` — для read-only индекса ок;
-   понадобится история для контекста — клонировать иначе.
-2. **Индексация:** обход дерева → code-aware чанкинг (по символам/функциям, не только по строкам) →
-   эмбеддинги через Ollama `nomic-embed :11434` → FAISS-индекс в `$JWP_DATA_DIR/indexes/<project-id>/`.
-3. **PR-флоу:** отдельная рабочая ветка `jworkplace/<feature>` → LLM генерирует патч →
-   применяем (`git apply` / запись файлов) → `commit` → `push` → **PR через `gh`/GitHub API** →
-   ссылку показываем пользователю. Всё после его подтверждения.
-4. **Почему безопасно без Docker:** мы **не запускаем** чужой код — только читаем и делаем git.
-   Главный оставшийся риск — утечка токена; держим его вне рабочей директории клона и вне логов.
-   Когда в фазе 2 добавим исполнение тестов/сборки — **тогда** вводим изоляцию (`## Открытые решения`).
+   `$JWP_DATA_DIR/repos/<project-id>/` (data dir **вне** git-дерева jWorkPlace). Shallow — экономим
+   диск/RAM. Большие/бинарные файлы фильтруем на этапе индексации. Оговорка: `--filter=blob:none` тянет
+   блобы лениво и ломает `git blame/log` — для read-only индекса ок; нужна история — клонировать иначе.
+2. **Индексация:** обход дерева → code-aware чанкинг → эмбеддинги через Ollama `nomic-embed :11434` →
+   FAISS-индекс в `$JWP_DATA_DIR/indexes/<project-id>/`.
+3. **PR-флоу:** отдельная рабочая ветка `jworkplace/<feature>` → LLM генерирует патч → применяем
+   (`git apply`) → `commit` → `push` → **PR через `gh`/GitHub API** → ссылку показываем. Всё после подтверждения.
+4. **Почему безопасно без Docker:** мы **не запускаем** чужой код — только читаем и делаем git. Главный
+   риск — утечка токена; держим его вне рабочей директории клона и вне логов. Исполнение тестов/сборки
+   (фаза 2) → **тогда** вводим изоляцию (`## Решения`).
 
 ---
 
@@ -273,7 +255,7 @@ Pull Request**. При подключении к проекту сам серв�
 В этом проекте слово «агент» означает две **совершенно разные** вещи:
 
 - **Слой A — мои dev-агенты (Claude Code personas).** Ими *я* строю jWorkPlace. Вызываются
-  мной через `Agent(subagent_type:"claude", model:…, prompt:"Ты ARCHITECT/…")`. См. `## Слой A`.
+  мной через `Agent(subagent_type:"architect", …)`. См. `## Слой A` и `## Профили оркестратора`.
 - **Слой B — runtime-рой продукта.** Это **фича, которую мы пишем**: LLM (DeepSeek) внутри
   jWorkPlace в рантайме анализирует чужой проект и поднимает роли-агентов, чтобы менять код и
   открывать PR. Я его не «вызываю» — я его **проектирую и реализую**. См. `## Слой B`.
@@ -360,16 +342,120 @@ detectComplexity(запрос)
 | 🐛 DEBUG SPECIALIST | opus | root-cause анализ багов |
 | ⚡ PERFORMANCE ENGINEER | opus | латентность индексации/поиска, память на 3.8 ГБ, размер бандла (опционально) |
 
-**Автомаршрутизация:** какого агента (и сколько) звать — **решаю сам** по таблице и характеру задачи,
-не переспрашивая пользователя. Спрашиваю только при реальной развилке (несколько равнозначных подходов
-или недостаёт вводных). Тривиальную задачу (1 файл, очевидно) делаю сам, без спавна.
 **Ревьюер по технологии:** TS/React → CODE REVIEWER; Python → BACKEND DEVELOPER.
-**Маршрутизация (типовое):** новая фича → ARCHITECT → DEVELOPER → REVIEWER; всё про рой/промпты/RAG-качество
-→ LLM ENGINEER или RAG/INDEXING ENGINEER первым; безопасность токенов/чужого кода → SECURITY AUDITOR.
 
 ---
 
-## Оркестрация (принципы Слоя A)
+## Профили оркестратора (Слой A)
+
+Конкретизация L0-каркаса (`~/.claude/CLAUDE.md`) под jWorkPlace. Каждый запрос обрабатывается в рамках
+**одного профиля**; профиль задаёт стадии, state machine переходов и состав агентов. **Оркестратор
+только делегирует** (детект профиля → цепочка → субагенты по стадиям → синтез → итог), сам работу
+стадий не пишет — кроме тривиальной правки 1 файла, git-операций стадии Ship и чтения для маршрутизации.
+
+### Автодетект профиля
+
+| Триггеры в запросе (регистронезависимо) | Профиль |
+|---|---|
+| баг, ошибка, краш, не работает, 500, stacktrace, регрессия, неверный ответ | **P2 Баг** |
+| фича, добавить, реализовать, endpoint, экран, интеграция, кнопка | **P1 Фича** |
+| чанк, эмбеддинг, FAISS, retrieval, recall, hybrid, RRF, abstain, индексаци | **P3 RAG-качество** |
+| рой, tool, function-calling, промпт, grounding, judge, Слой B, tool-loop, DeepSeek | **P4 Рой/LLM** |
+| утечка, токен, секрет, инъекция, scope, OWASP, аудит безопасности | **P5 Аудит** |
+| README, CLAUDE.md, PLAN.md, доку, nginx, systemd, env, конфиг | **P6 Дока/Конфиг** |
+| латентност, память, RAM, медленно, оптимизаци | **+⚡Perf** (модификатор) |
+| задеплой, прод, jwork.jorchik.com, certbot | **+🚀Deploy** (модификатор) |
+
+Приоритет при конфликте: **P5 > P4 > P3 > P2 > P1 > P6**. Дальше — **режим autonomous-run по
+умолчанию:** детект → **объяви профиль одной строкой и продолжай** («Профиль: **X**, autonomous-run»),
+НЕ спрашивай подтверждение. `AskUserQuestion` по профилю — только при реальном конфликте детекта (два
+профиля равного приоритета) или в security-профиле P5. Пользователь назвал профиль явно — тоже без вопросов.
+🔒 **Security-gate (закон):** любой профиль, задевающий токены/секреты/контент чужого репо/промпты
+Слоя B — **обязан** включить `security-auditor` в консилиум, даже P1/P2/P3.
+
+### Профили: стадии, переходы, агенты
+
+Легенда: **П** = параллельно (консилиум), **→** = последовательно. Консилиум ≥3 opus-агентов — только
+для задач 3+ файлов или с арх/security-решением (иначе один ведущий).
+
+**P1 — Фича.** `Explore → Plan → Build → Review → Validate → Ship → Report → Done`
+```
+Explore→Plan  Plan→Build  Build→Review  Review→Build  Review→Validate
+Validate→Ship  Validate→Build (тесты красные)  Validate→Explore (понято неверно)  Ship→Report→Done
+```
+| Стадия | Агент(ы) | Режим |
+|---|---|---|
+| Explore | **консилиум:** `architect` + домен(`backend-developer`/`frontend-developer`) [+`ui-ux-specialist` если UI] [+`security-auditor` если secrets] | П |
+| Plan | оркестратор в `EnterPlanMode` (синтез консилиума) | → |
+| Build | `backend-developer` и/или `frontend-developer`; 2 домена → worktree, П | П/→ |
+| Review | Python→`backend-developer`; TS/React→`code-reviewer`; скилл `/code-review` medium (≥2 файла) | П по технологиям |
+| Validate | `qa-engineer` (pytest/vitest) + `verify`/`run`; Web-UI — Chrome MCP; backend — curl `/api/health` | → |
+| Ship | оркестратор: commit/PR [+🚀Deploy: systemd/nginx + prod-smoke] | → |
+
+**P2 — Баг.** `Reproduce → Diagnose → Fix → Validate → Ship → Report → Done`
+```
+Reproduce→Diagnose  Reproduce→Report (не воспроизводится)  Diagnose→Fix  Diagnose→Reproduce
+Diagnose→Report  Fix→Validate  Fix→Diagnose  Validate→Ship  Validate→Fix  Validate→Diagnose  Ship→Report→Done
+```
+| Стадия | Агент(ы) | Режим |
+|---|---|---|
+| Reproduce | `qa-engineer` + Bash/MCP, персистентный `swarm-report/<slug>-reproduce.md` | → |
+| Diagnose | **консилиум:** `debug-specialist` (ведущий) [+`backend-developer`/`rag-indexing-engineer`/`llm-engineer` по слою] [+`security-auditor` если утечка] | П |
+| Fix | агент по слою бага | → |
+| Validate | `qa-engineer`: регресс-тест на баг + полный прогон | → |
+
+**P3 — RAG-качество.** `Baseline → Design → Build → Eval → Ship → Report → Done`
+```
+Baseline→Design  Design→Build  Build→Eval  Eval→Ship (метрики не упали)
+Eval→Build (recall/MRR просели)  Eval→Design (подход не даёт прироста)  Ship→Report→Done
+```
+| Стадия | Агент(ы) | Режим |
+|---|---|---|
+| Baseline | `rag-indexing-engineer`: снять текущие recall@k/MRR из `eval/` | → |
+| Design | **консилиум:** `rag-indexing-engineer` (ведущий) + `performance-engineer` (RAM 3.8 ГБ) | П |
+| Build | `backend-developer` под ТЗ rag-инженера | → |
+| Eval | `rag-indexing-engineer`: прогон eval, diff к baseline (regression-гейт) | → |
+
+**P4 — Рой/LLM (Слой B).** `Explore → Design → Build → SecReview → Eval → Ship → Report → Done`
+```
+Explore→Design  Design→Build  Build→SecReview  SecReview→Build (инъекция/leak/цитаты)
+SecReview→Eval  Eval→Ship  Eval→Build (регресс качества)  Eval→Design (промпт/схема)  Ship→Report→Done
+```
+| Стадия | Агент(ы) | Режим |
+|---|---|---|
+| Explore | `llm-engineer` [+`architect` если меняются границы] | П если 2 |
+| Design | **консилиум:** `llm-engineer` (ведущий) + **`security-auditor` (обязателен)** [+`architect`] | П |
+| Build | `backend-developer` (tool-исполнители/loop), `frontend-developer` (панель) | П (worktree) |
+| SecReview | `security-auditor` — читает готовый код | → |
+| Eval | `llm-engineer`: grounded-eval + LLM-judge + проверка лимитов loop/cost | → |
+
+**P5 — Аудит-безопасности.** `Scope → Audit → Triage → Report → Done` (фикс уходит в P1/P2, не здесь)
+```
+Scope→Audit  Audit→Triage  Triage→Report  Report→Done
+```
+| Стадия | Агент | Режим |
+|---|---|---|
+| Audit | **консилиум:** `security-auditor` (ведущий) [+`architect` для арх-рисков] | П если 2 |
+| Triage | `security-auditor`: severity + рекомендации | → |
+| Report | оркестратор; critical/high → **порождает новую задачу** в P1/P2 с findings как входом | → |
+
+**P6 — Дока/Конфиг.** `Edit → Verify → Done` (**без Plan Mode, без консилиума**)
+```
+Edit→Verify  Verify→Edit (рендер/линт/nginx -t упал)  Verify→Done
+```
+| Стадия | Агент | Режим |
+|---|---|---|
+| Edit | оркестратор сам (1 файл) **или** 1 профильный агент | → |
+| Verify | `verify`: рендер MD / `nginx -t` / парс env | → |
+
+### Персистентность к компактизации
+Валидационные стадии ведут файл-состояние в `swarm-report/` (`*-e2e-scenario.md` для P1,
+`*-reproduce.md` для P2, `*-eval-run.md` для P3/P4) — перед каждым действием перечитывать, `[x]`-шаги
+не повторять, продолжать с первого `[ ]`.
+
+---
+
+## Оркестрация (быстрые принципы)
 
 1. Параллельно — независимые задачи. 2. Последовательно — когда результат нужен следующему.
 3. Минимальный контекст каждому агенту (конкретные файлы/строки, не «весь проект»).
@@ -377,6 +463,20 @@ detectComplexity(запрос)
 не пересказывает. 6. Модель по роли. 7. Фоновые агенты (`run_in_background`), если результат не нужен сразу.
 - `/code-review` medium — автоматически после блока изменений в **2+ файлах** с логикой (кроме правок только в доке).
 - **Explore** — до работы, если фиксишь паттерн / меняешь сигнатуру / ищешь call sites / изучаешь конвенцию.
+- **Автомаршрутизация:** какого агента (и сколько) звать — решаю сам по профилю и характеру задачи,
+  не переспрашивая; спрашиваю только при реальной развилке. Тривиальную задачу (1 файл) делаю сам.
+- **Контекст оркестратора (не раздувать — это заметно по скорости забивания окна).** Для маршрутизации
+  оркестратор **НЕ открывает код**: `Read`/`Grep` содержимого файлов — только карты CLAUDE.md/PLAN.md/
+  CHANGELOG, `ls`, `git status`/`git log --oneline`. Нужно понять код — спавни `Explore`/доменного агента
+  и получи дайджест. Файл руками читаю **только чтобы его править**, не «на посмотреть». Субагенты и так
+  изолированы (их `Read/Grep/Bash` в мой контекст не возвращается) — окно набивает то, что делаю САМ.
+- **Дайджест, не простыня.** Каждый агент возвращает ≤~40 строк (результат + файлы:символы + принятые
+  развилки + что проверить), длинные листинги/диффы — ссылкой на файл. Синтез стадии для пользователя
+  ≤10 строк; сырой вывод агента в контекст оркестратора НЕ копируется — только дайджест.
+- **Review — блокирующий гейт, не рекомендация.** В P1/P2/P4 стадия Review производит вердикт (первая
+  строка `PASS`/`FAIL` + находки с evidence); **`Ship` недостижим без `PASS`**. `critical`/`FAIL` без
+  воспроизводимого сценария → downgrade до `medium`, не блок (защита от ложных critical). `/code-review`
+  перед commit — железно через hook (`.claude/settings.local.json`), не только «модель вспомнит».
 
 ---
 
@@ -385,26 +485,32 @@ detectComplexity(запрос)
 Единственная точка контроля — решение вызывать `EnterPlanMode` или нет (внутри Plan Mode его шаблон
 всегда перебьёт фоновое правило CLAUDE.md — не управляй фазами изнутри).
 
-**Перед каждым `EnterPlanMode` проверь:** нужен ли задаче доменный эксперт
-(ARCHITECT / LLM ENGINEER / RAG-INDEXING / SECURITY AUDITOR / PERFORMANCE / DEBUG)?
-- **ДА → сначала** запусти эксперта в обычном режиме (промпт ≤200 слов: ключевые решения и риски),
-  дождись вывода, **потом** `EnterPlanMode`.
-- **НЕТ** (чистый FRONTEND/BACKEND, архитектура не меняется) → можно сразу.
+**Режим по умолчанию — autonomous-run.** Рутинная задача (P1/P2/P3, укладывается в ≤~3 файла ИЛИ есть
+чёткий дефолт в инвариантах, постановка чёткая) идёт **БЕЗ Plan Mode и БЕЗ показа плана на утверждение**:
+оркестратор сразу гонит цепочку профиля (Explore→Build→Review→Validate), а качество держат **встроенные
+гейты** (Review=PASS, DoD developer-агентов, hooks), а не round-trip к пользователю. План — опциональный
+артефакт, не обязательный шлюз. Субагенты решают развилки реализации сами (см. блок «Автономность» в их
+промптах) и эскалируют только security/необратимое/противоречие инвариантам.
 
-**Когда Plan Mode нужен:** пользователь назвал задачу большой/сложной; 3+ файла с нетривиальными
-изменениями; новая фича с архитектурными решениями; изменение границ (backend↔индексатор↔RAG↔GitHub);
-размытая постановка. **Не входи** для мелких правок (1–2 файла), очевидных багфиксов, правок доки.
-**Ловушка:** обсуждение в чате ≠ прохождение гейта. «Давай делаем» — триггер запустить гейт
-(эксперт → потом Plan Mode), а не код напрямую.
+**Plan Mode (с ожиданием одобрения) нужен ТОЛЬКО когда:** меняются границы
+(backend↔индексатор↔RAG↔GitHub); задача про Слой B / промпты / grounding; security-задача (P5 или
+сработал security-gate); **размытая постановка** (единственный не-security повод показать план — иначе
+автономный прогон даст быстрый, но не тот результат); либо пользователь явно просит «покажи план».
+
+**Гейт эксперта:** если Plan Mode всё же нужен — сперва доменный эксперт
+(ARCHITECT / LLM ENGINEER / RAG-INDEXING / SECURITY AUDITOR / PERFORMANCE / DEBUG) в обычном режиме
+(≤200 слов), дождись вывода, **потом** `EnterPlanMode` (в профилях это стадия Explore/Design/Diagnose).
+**Ловушка:** «давай делаем» на security/границах = запустить гейт (эксперт → Plan Mode), а не код
+напрямую; на рутине = autonomous-run сразу, без плана.
 
 ---
 
 ## Роль Claude — советник
 
-Пользователь изучает LLM/RAG/агентов/веб — не все паттерны Claude Code (агенты, worktree, хуки,
-`/loop`, фоновые задачи, `/schedule`) и предметной области ему известны. Подмечай упущенные
-возможности, лучшие паттерны, ограничения текущего решения — **одно короткое замечание в конце
-ответа**, не лекция.
+Персона и стиль советника — в L0 (`~/.claude/CLAUDE.md`). Проектная специфика: пользователь изучает
+LLM/RAG/агентов/веб — не все паттерны Claude Code (агенты, worktree, хуки, `/loop`, фоновые задачи,
+`/schedule`) и предметной области ему известны. Подмечай упущенные возможности и лучшие паттерны —
+**одно короткое замечание в конце ответа**, не лекция.
 
 ---
 
@@ -415,7 +521,7 @@ detectComplexity(запрос)
 - **Grounded-точность** — доля ответов с валидными (line-based) цитатами + корректный `abstain` на off-topic.
 - **PR-качество** — доля патчей, проходящих `git apply --check`, и доля принятых пользователем PR.
 
-Отчёты — по паттерну `webchat/eval` / `rag/eval`.
+Отчёты — по паттерну `webchat/eval` / `rag/eval`. Текущие baseline — в `CHANGELOG.md`.
 
 ---
 

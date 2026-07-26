@@ -16,6 +16,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from app import db
+from app.api import review as review_api
 from app.config import get_settings
 from app.main import create_app
 from app.review import reviewer
@@ -582,10 +583,10 @@ def test_review_endpoint_project_not_ready(test_client, data_dir):
 
 
 def test_review_endpoint_diff_too_large(test_client, data_dir):
-    """Diff превышает лимит → 422."""
+    """Diff превышает жёсткий протокольный потолок (_REQUEST_MAX_DIFF_LEN) → 422."""
     db.create_project("test-pid", "https://github.com/test/repo.git", "test/repo", db.STATUS_READY)
 
-    huge_diff = "x" * (100_000 + 1)
+    huge_diff = "x" * (review_api._REQUEST_MAX_DIFF_LEN + 1)
     req = {
         "diff": huge_diff,
         "changed_files": [],
@@ -595,6 +596,81 @@ def test_review_endpoint_diff_too_large(test_client, data_dir):
     }
     resp = test_client.post("/api/projects/test-pid/review", json=req)
     assert resp.status_code == 422
+
+
+def test_review_endpoint_diff_within_new_limit_not_truncated(test_client, data_dir):
+    """Diff между старым (100 КБ) и новым (_DIFF_LIMIT=200 КБ) лимитом проходит БЕЗ усечения —
+    регрессия на баг PR #6 (двойное усечение: workflow head -c 100000 + backend Field(max_length)
+    совпадали, из-за чего был_truncated никогда не мог стать True)."""
+    db.create_project("test-pid", "https://github.com/test/repo.git", "test/repo", db.STATUS_READY)
+
+    # Больше старого лимита (100_000), но в пределах нового _DIFF_LIMIT (200_000).
+    filler = "+content line\n" * 10_000  # ~140_000 символов
+    diff = "diff --git a/src/big.py b/src/big.py\n" + filler
+    assert len(diff) <= review_api._DIFF_LIMIT
+
+    mock_review_json = json.dumps({
+        "summary": "OK", "bugs": [], "architecture": [], "recommendations": [],
+    })
+
+    with patch("app.review.reviewer.hybrid.hybrid_search") as mock_search, \
+         patch("app.api.review.get_llm") as mock_llm_factory:
+        mock_search.return_value = []
+        mock_llm = AsyncMock()
+        mock_llm.chat = AsyncMock(return_value=mock_review_json)
+        mock_llm_factory.return_value = mock_llm
+
+        req = {
+            "diff": diff,
+            "changed_files": ["src/big.py"],
+            "pr_number": 6,
+            "pr_title": "big PR",
+            "pr_body": None,
+        }
+        resp = test_client.post("/api/projects/test-pid/review", json=req)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert "усечён" not in data["review_markdown"] and "обрезан" not in data["review_markdown"]
+
+
+def test_review_endpoint_diff_over_soft_limit_truncated_with_notice(test_client, data_dir):
+    """Diff за пределами мягкого _DIFF_LIMIT (но в пределах хард-лимита Field) → усекается, и
+    markdown-ответ ЧЕСТНО предупреждает об этом (иначе пользователь доверяет находкам по обрывку
+    diff — см. ложный [critical] на PR #6)."""
+    db.create_project("test-pid", "https://github.com/test/repo.git", "test/repo", db.STATUS_READY)
+
+    filler = "+content line\n" * 20_000  # ~280_000 символов — больше _DIFF_LIMIT (200_000)
+    diff = "diff --git a/src/huge.py b/src/huge.py\n" + filler
+    assert len(diff) > review_api._DIFF_LIMIT
+    assert len(diff) <= review_api._REQUEST_MAX_DIFF_LEN
+
+    mock_review_json = json.dumps({
+        "summary": "OK", "bugs": [], "architecture": [], "recommendations": [],
+    })
+
+    with patch("app.review.reviewer.hybrid.hybrid_search") as mock_search, \
+         patch("app.api.review.get_llm") as mock_llm_factory:
+        mock_search.return_value = []
+        mock_llm = AsyncMock()
+        mock_llm.chat = AsyncMock(return_value=mock_review_json)
+        mock_llm_factory.return_value = mock_llm
+
+        req = {
+            "diff": diff,
+            "changed_files": ["src/huge.py"],
+            "pr_number": 7,
+            "pr_title": "huge PR",
+            "pr_body": None,
+        }
+        resp = test_client.post("/api/projects/test-pid/review", json=req)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert str(review_api._DIFF_LIMIT) in data["review_markdown"]
+    assert "усечён" in data["review_markdown"] or "обрезан" in data["review_markdown"]
 
 
 def test_review_endpoint_too_many_changed_files(test_client, data_dir):
