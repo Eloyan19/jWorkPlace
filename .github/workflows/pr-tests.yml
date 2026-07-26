@@ -1,0 +1,106 @@
+# Автотесты на PR — два уровня (задание «два уровня тестирования»).
+#
+# Level 1 (code-tests): pytest (backend) + vitest (frontend). Полностью самодостаточны и офлайн
+#   (conftest сам поднимает временный $JWP_DATA_DIR; сеть/LLM/Ollama замоканы) → гоняются на
+#   обычном GitHub-hosted раннере на КАЖДЫЙ PR автоматически. Это основной автоматический гейт.
+#
+# Level 2 (ui-smoke): Playwright UI-smoke. Сценарии grounded-чата/поиска/переключения проектов
+#   завязаны на ЖИВОЙ backend :8200 + Ollama (nomic-embed) + DeepSeek + проиндексированные проекты.
+#   На чистом облачном раннере этого нет → smoke гоняется на SELF-HOSTED раннере (VPS jorchik.com),
+#   где эта среда уже есть (systemd jworkplace.service). Скриншоты — артефактом.
+#
+# Безопасность (тот же принцип, что в ai-review.yml):
+# - Триггер pull_request (НЕ pull_request_target): форкам secrets не отдаём.
+# - Оба job — только для НЕ-форк PR (if fork == false). Self-hosted + публичный репо: чужой код
+#   форка на нашем раннере не исполняем (иначе RCE на VPS). Свои feature-ветки — ок.
+# - ui-smoke включается репо-переменной ENABLE_SELF_HOSTED_SMOKE=true (ставится, когда на VPS
+#   зарегистрирован раннер) — иначе job пропускается, а не висит в pending.
+# - Минимальные permissions (contents: read).
+
+name: Тесты PR (два уровня)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  # ── Level 1 — код-тесты (GitHub-hosted, автоматически на каждый PR) ──────────────────────────
+  code-tests:
+    name: Level 1 — код-тесты (pytest + vitest)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.head.repo.fork == false }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+
+      - name: pytest (backend)
+        working-directory: backend
+        run: python -m pytest -q
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: vitest (frontend)
+        working-directory: frontend
+        run: npm test
+
+      - name: Build (tsc + vite — проверка типов)
+        working-directory: frontend
+        run: npm run build
+
+  # ── Level 2 — UI-smoke (self-hosted на VPS: живой :8200 + Ollama + DeepSeek) ─────────────────
+  ui-smoke:
+    name: Level 2 — Playwright UI-smoke
+    needs: code-tests
+    # Требует зарегистрированного self-hosted раннера на VPS + репо-переменную ENABLE_SELF_HOSTED_SMOKE=true.
+    if: ${{ github.event.pull_request.head.repo.fork == false && vars.ENABLE_SELF_HOSTED_SMOKE == 'true' }}
+    runs-on: [self-hosted, linux]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install chromium
+
+      # webServer в playwright.config.ts сам поднимает `npm run dev` (Vite), проксируя /api → :8200
+      # (уже запущенный systemd-бэкенд с Ollama/DeepSeek/индексами). Смоук кликает по реальному UI.
+      - name: Playwright UI-smoke
+        working-directory: frontend
+        run: npx playwright test --reporter=list
+
+      - name: Upload скриншоты + отчёт
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: |
+            frontend/e2e/screenshots/
+            frontend/playwright-report/
+          retention-days: 14
