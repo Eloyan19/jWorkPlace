@@ -354,6 +354,8 @@ def test_generate_happy_path_new_technology_concept(data_dir, monkeypatch):
     ])
     _write_repo_file("README.md", "# Demo\nDemo project using FastAPI.\n")
     _no_hybrid(monkeypatch)
+    # Эмбеддинг нового концепта иначе уходит в реальный Ollama — мокаем (герметичность в CI без сети).
+    monkeypatch.setattr(embeddings, "embed_query", lambda text: _vec(1.0, 0.0))
 
     reply = json.dumps({
         "overview": "Демо-проект на FastAPI.",

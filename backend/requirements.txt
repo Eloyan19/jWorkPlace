@@ -3,6 +3,8 @@ uvicorn[standard]
 httpx
 pydantic-settings
 pytest
+# async-тесты (llm-адаптер) помечены @pytest.mark.asyncio — без плагина падают в чистом окружении.
+pytest-asyncio==1.4.0
 
 # --- Этап 1: индексация ---
 # tree-sitter + грамматики: версии пиннуем — рассинхрон ABI грамматик частый провал.
