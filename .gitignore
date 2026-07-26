@@ -12,6 +12,11 @@
 *.sqlite3
 *.db
 
+# --- QA / e2e артефакты (регенерируются прогоном) ---
+backend/.coverage
+frontend/test-results/
+frontend/playwright-report/
+
 # --- Python (backend / индексатор) ---
 __pycache__/
 *.py[cod]

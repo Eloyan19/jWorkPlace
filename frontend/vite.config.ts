@@ -19,5 +19,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/setupTests.ts'],
+    // vitest — только unit-тесты в src/. E2E (frontend/e2e/*.spec.ts) гоняет Playwright,
+    // его API несовместимо с vitest — иначе vitest подхватит smoke.spec.ts по глобу *.spec.ts.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })
