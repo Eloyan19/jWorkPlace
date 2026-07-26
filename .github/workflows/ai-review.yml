@@ -36,6 +36,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          # SHA head-коммита PR — помечаем каждый комментарий-ревью, к какому состоянию относится.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Недоверенные данные — только через env (защита от script injection).
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -98,16 +100,13 @@ jobs:
             exit 0
           fi
 
-          # Обновляем ОДИН комментарий по скрытому маркеру (иначе на synchronize плодятся дубли).
-          MARKER='<!-- jworkplace-ai-review -->'
-          COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq "map(select(.body | contains(\"${MARKER}\"))) | last | .id // empty")
-
-          if [ -n "${COMMENT_ID:-}" ]; then
-            gh api --method PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" \
-              -F body=@review.md >/dev/null
-            echo "Комментарий ревью обновлён (id=${COMMENT_ID})."
-          else
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file review.md
-            echo "Комментарий ревью создан."
-          fi
+          # Каждый прогон — НОВЫЙ комментарий (по запросу: в PR видна эволюция ревью «до/после»
+          # изменений, а не перезапись одного). Помечаем шапкой с коммитом, к которому относится
+          # ревью, — иначе неотличимо, какое ревью к какому состоянию PR. Скрытый маркер от backend
+          # остаётся в теле (безвреден); поиск/PATCH существующего убран намеренно.
+          {
+            printf '> 🔄 Авто-ревью коммита `%s` · %s UTC\n\n' "${HEAD_SHA:0:7}" "$(date -u '+%Y-%m-%d %H:%M')"
+            cat review.md
+          } > comment.md
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file comment.md
+          echo "Комментарий ревью создан (коммит ${HEAD_SHA:0:7})."
