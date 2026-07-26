@@ -7,6 +7,9 @@
 
 > TL;DR стек: **Ollama** (движок) + **qwen2.5-coder** (модели) + расширение **Twinny** (проще) или
 > **Continue** (гибче) в **VS Code**. Правила — короткие, директивные (маленькая модель ≠ Opus).
+>
+> **ОС: Windows.** Все команды ниже — в **PowerShell** (жми `Win`, набери «PowerShell»). Ollama на
+> Windows работает как фоновое приложение в трее, а не как systemd-сервис.
 
 ---
 
@@ -43,11 +46,19 @@ LM Studio — это движок (+ свой GUI-чат), **не** автоко
 
 ## 2. Шаг 1 — Ollama и модели
 
-```bash
-# Установка (Linux/macOS)
-curl -fsSL https://ollama.com/install.sh | sh    # или brew install ollama
+**Предпосылки (Windows), ставятся через winget в PowerShell:**
+```powershell
+winget install Ollama.Ollama                 # движок LLM
+winget install OpenJS.NodeJS.LTS             # Node (для frontend/расширений)
+winget install Python.Python.3.12            # Python (для backend)
+winget install Git.Git                        # git
+winget install Microsoft.VisualStudioCode    # редактор
+```
+После установки Ollama запустится в трее и поднимет API на `http://localhost:11434`. Проверка:
+`ollama --version`. (GPU NVIDIA подхватывается автоматически, если есть CUDA-драйвер.)
 
-# Модели (пример под 16 ГБ)
+**Модели (пример под 16 ГБ):**
+```powershell
 ollama pull qwen2.5-coder:7b           # чат/правки (instruct)
 ollama pull qwen2.5-coder:1.5b-base    # автокомплит (FIM)
 ollama pull nomic-embed-text           # эмбеддинги для индексации кодовой базы (@codebase)
@@ -58,15 +69,19 @@ ollama pull nomic-embed-text           # эмбеддинги для индек�
 **Ollama по умолчанию даёт всего 2048–4096 токенов контекста**, даже если модель поддерживает 128K.
 Из-за этого чат «забывает» файлы. Подними явно одним из способов:
 
-**A. Глобально (env, простейше):**
-```bash
-export OLLAMA_CONTEXT_LENGTH=16384      # положи в ~/.bashrc / ~/.zshrc, перезапусти `ollama serve`
+**A. Глобально (env-переменная):**
+```powershell
+setx OLLAMA_CONTEXT_LENGTH 16384    # запишется в переменные окружения пользователя (навсегда)
 ```
+⚠️ `setx` действует для **новых** процессов. Чтобы применить: правой кнопкой по иконке Ollama в трее →
+**Quit**, затем запусти Ollama заново (иначе движок продолжит работать со старым значением).
+(Альтернатива через GUI: `Win` → «Изменение переменных среды текущего пользователя» → добавить
+`OLLAMA_CONTEXT_LENGTH=16384`.)
 
 **B. Отдельной моделью с зашитым num_ctx (рекомендую для чата — не трогает автокомплит):**
-```bash
-# см. Modelfile.qwen-chat в этой папке
-ollama create qwen-chat-16k -f docs/local-qwen-assistant/Modelfile.qwen-chat
+```powershell
+# см. Modelfile.qwen-chat в этой папке (запускать из корня клонированного репо)
+ollama create qwen-chat-16k -f docs\local-qwen-assistant\Modelfile.qwen-chat
 ```
 
 **C. Пер-запрос** — многие расширения умеют слать `options.num_ctx` (в Continue — поле `contextLength`).
@@ -88,8 +103,9 @@ ollama create qwen-chat-16k -f docs/local-qwen-assistant/Modelfile.qwen-chat
 
 ### Вариант B — Continue (гибче, конфиг-файлом)
 1. VS Code → Extensions → установить **Continue**.
-2. Скопируй пример `docs/local-qwen-assistant/continue-config.yaml` в `~/.continue/config.yaml`
-   (глобально) и правь под свои модели.
+2. Скопируй пример `docs\local-qwen-assistant\continue-config.yaml` в
+   `%USERPROFILE%\.continue\config.yaml` (т.е. `C:\Users\<ты>\.continue\config.yaml`) и правь под свои модели.
+   Создать папку при необходимости: `mkdir $env:USERPROFILE\.continue\rules -Force` в PowerShell.
 3. Правила проекта Continue подхватит из `.continue/rules/` в репозитории автоматически (см. §4).
 
 **Что выбрать:** Twinny — если цель «быстро получить чат+автокомплит и тыкать модели». Continue — если
@@ -107,8 +123,8 @@ ollama create qwen-chat-16k -f docs/local-qwen-assistant/Modelfile.qwen-chat
 - **Без оркестрации/субагентов** — локальная модель этого не делает.
 
 Готовые файлы в PR:
-- **Глобальный** (как ты работаешь везде): `docs/local-qwen-assistant/rules/global-rules.md` →
-  скопировать в `~/.continue/rules/00-global.md` (Continue) **или** вставить в System Prompt Twinny.
+- **Глобальный** (как ты работаешь везде): `docs\local-qwen-assistant\rules\global-rules.md` →
+  скопировать в `%USERPROFILE%\.continue\rules\00-global.md` (Continue) **или** вставить в System Prompt Twinny.
 - **Проектный** (инварианты jWorkPlace, дистиллят из `CLAUDE.md`): уже лежит в репо как
   `.continue/rules/00-jworkplace-general.md` + `10-backend.md` + `20-frontend.md` — Continue
   подхватит их автоматически при работе в этом репозитории (frontmatter `globs` scoped'ит backend/
@@ -166,14 +182,18 @@ Continue грузит правила из `.continue/rules/*.md` в лексик
 
 ## 7. Работа под jWorkPlace (пример)
 
-```bash
-git clone https://github.com/Eloyan19/jWorkPlace.git && cd jWorkPlace
-# backend
-python -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+```powershell
+git clone https://github.com/Eloyan19/jWorkPlace.git; cd jWorkPlace
+# backend (venv на Windows — папка Scripts, не bin; активаторы .ps1/.bat, бинари .exe)
+python -m venv backend\.venv
+backend\.venv\Scripts\pip.exe install -r backend\requirements.txt
 # frontend
-cd frontend && npm ci && cd ..
-code .    # откроется VS Code; Continue подхватит .continue/rules/*
+cd frontend; npm ci; cd ..
+code .    # откроется VS Code; Continue подхватит .continue\rules\*
 ```
+> Если PowerShell блокирует активацию venv (`.venv\Scripts\Activate.ps1`) — один раз выполни
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. Активация не обязательна: можно звать
+> `backend\.venv\Scripts\python.exe` напрямую.
 В Continue включи индекс кодовой базы (`@codebase`) — и спрашивай «где вызывается X», «что делает
 модуль Y». Правила из `.continue/rules/` уже задают инварианты (fail-closed, `to_thread`, `api.ts`,
 секреты в env), так что локальная модель будет предлагать правки в стиле проекта, а не «в вакууме».
