@@ -1035,6 +1035,35 @@ body {
   }
 }
 
+/* Компактный бар «активный проект» над tab-pane (только на проектных вкладках,
+   см. App.tsx) — приглушённый, не конкурирует по вниманию с самими вкладками. */
+.active-project-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .active-project-bar {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.active-project-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.active-project-name {
+  font-weight: 500;
+}
+
 .tab-pane[hidden] {
   display: none;
 }
