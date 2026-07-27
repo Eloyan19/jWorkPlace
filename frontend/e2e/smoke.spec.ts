@@ -54,7 +54,7 @@ test('S1: health и загрузка страницы', async ({ page }) => {
   console.log('  health: online')
   await shot(page, 'health-online')
 
-  // Навигация: 6 вкладок (Чат/О проекте/Структура/Поиск/Правки/Поддержка).
+  // Навигация: 6 вкладок (Чат/О проекте/Структура/Поиск/Правки + отделённая Поддержка сервиса).
   const tabs = page.getByRole('tab')
   await expect(tabs).toHaveCount(6)
   await expect(page.locator('section.projects-panel')).toBeVisible()
