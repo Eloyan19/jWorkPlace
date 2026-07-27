@@ -297,6 +297,28 @@ export async function markSummaryRead(projectId: string): Promise<{ ok: true }> 
   return (await res.json()) as { ok: true }
 }
 
+export async function markConceptKnown(slug: string): Promise<{ ok: true }> {
+  const res = await fetch(`/api/knowledge/concepts/${slug}/known`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { ok: true }
+}
+
+export async function resetKnownCatalog(): Promise<{ ok: true }> {
+  const res = await fetch(`/api/knowledge/concepts/reset`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res))
+  }
+  return (await res.json()) as { ok: true }
+}
+
 // Глобальный каталог «что я уже знаю» (опциональная панель, не привязана к проекту).
 export async function getConcepts(): Promise<KnownConcept[]> {
   const res = await fetch('/api/knowledge/concepts', { headers: authHeaders() })

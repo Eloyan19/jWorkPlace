@@ -190,6 +190,7 @@ export interface ConceptDetail {
   name: string
   detail: string
   evidence: ConceptEvidence[]
+  slug: string
 }
 
 // Глобальный каталог «что я уже знаю» (GET /api/knowledge/concepts, опциональная панель).

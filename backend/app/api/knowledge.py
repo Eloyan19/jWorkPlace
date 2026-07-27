@@ -87,6 +87,23 @@ async def mark_read(project_id: str) -> dict:
     return {"ok": True}
 
 
+@router.post("/concepts/{slug}/known")
+async def mark_concept_known(slug: str) -> dict:
+    """Пометить концепт с указанным slug известным."""
+    row = db.get_concept_by_slug(slug)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Концепт не найден.")
+    await asyncio.to_thread(db.mark_concept_known, slug)
+    return {"ok": True}
+
+
+@router.post("/concepts/reset")
+async def reset_known_catalog() -> dict:
+    """Мягкий сброс всех концептов на known=0."""
+    await asyncio.to_thread(db.reset_known_catalog)
+    return {"ok": True}
+
+
 @router.get("/concepts")
 async def list_concepts() -> list[dict]:
     """Глобальный каталог «что я знаю» — bare-массив (см. конвенцию GET /api/projects)."""

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getProject, getSummary, markSummaryRead } from '../api'
+import { getProject, getSummary, markSummaryRead, resetKnownCatalog } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { Project, ProjectSummary } from '../types'
 
@@ -114,9 +114,18 @@ function SummaryPanel({ active }: { active: boolean }) {
     })
   }, [])
 
+  const handleResetKnown = useCallback(async () => {
+    if (window.confirm('Вы действительно хотите очистить базу знаний?')) {
+      await resetKnownCatalog()
+      // Перезагрузить выжимку
+      window.location.reload()
+    }
+  }, [])
+
   return (
     <section className="summary-panel">
       <h2>О проекте</h2>
+      <button onClick={handleResetKnown}>Очистить базу знаний</button>
 
       {!activeId ? (
         <p className="summary-hint">выберите готовый проект в списке выше</p>

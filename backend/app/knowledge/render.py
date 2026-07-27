@@ -20,7 +20,7 @@ def render(project_id: str) -> dict:
     known_concepts = []
     for row in db.get_project_concepts(project_id):
         if row["known"]:
-            known_concepts.append({"name": row["name"]})
+            known_concepts.append({"name": row["name"], "slug": row["slug"]})
             continue
         evidence = []
         if row["evidence"]:
@@ -28,7 +28,9 @@ def render(project_id: str) -> dict:
                 evidence = json.loads(row["evidence"])
             except (json.JSONDecodeError, TypeError):
                 evidence = []
-        new_concepts.append({"name": row["name"], "detail": row["detail"], "evidence": evidence})
+        new_concepts.append(
+            {"name": row["name"], "detail": row["detail"], "evidence": evidence, "slug": row["slug"]}
+        )
 
     try:
         tech = json.loads(summary["tech"]) if summary["tech"] else []

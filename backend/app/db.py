@@ -550,7 +550,7 @@ def get_project_concepts(project_id: str) -> list[sqlite3.Row]:
         return conn.execute(
             "SELECT pc.concept_id AS concept_id, c.name AS name, c.category AS category, "
             "c.description AS description, c.known AS known, pc.detail AS detail, "
-            "pc.evidence AS evidence "
+            "pc.evidence AS evidence, c.slug AS slug "
             "FROM project_concepts pc JOIN concepts c ON c.id = pc.concept_id "
             "WHERE pc.project_id = ?",
             (project_id,),
@@ -566,6 +566,22 @@ def mark_concepts_known(project_id: str) -> None:
             "WHERE known = 0 AND id IN (SELECT concept_id FROM project_concepts WHERE project_id = ?)",
             (project_id,),
         )
+
+
+def mark_concept_known(slug: str) -> None:
+    """Пометить концепт с указанным slug известным."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE concepts SET known = 1, known_at = COALESCE(known_at, datetime('now')) "
+            "WHERE known = 0 AND slug = ?",
+            (slug,),
+        )
+
+
+def reset_known_catalog() -> None:
+    """Мягкий сброс всех концептов на known=0."""
+    with get_conn() as conn:
+        conn.execute("UPDATE concepts SET known = 0")
 
 
 def list_known_concepts() -> list[sqlite3.Row]:
