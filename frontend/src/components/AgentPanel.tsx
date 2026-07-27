@@ -145,9 +145,7 @@ function AgentPanel() {
         Примеры: «найди все использования X», «сгенерируй CHANGELOG», «проверь инварианты».
       </p>
 
-      {!activeId ? (
-        <p className="agent-hint">выберите готовый проект в списке выше</p>
-      ) : notReady ? (
+      {notReady ? (
         <p className="agent-hint">
           проект {project?.name ? `«${project.name}» ` : ''}ещё индексируется — дождитесь статуса «готов»
         </p>

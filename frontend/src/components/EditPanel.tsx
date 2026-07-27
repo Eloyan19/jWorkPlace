@@ -135,9 +135,7 @@ function EditPanel() {
         subtitle="Быстрый одношаговый патч → превью diff → PR"
       />
 
-      {!activeId ? (
-        <p className="edit-hint">выберите готовый проект в списке выше</p>
-      ) : notReady ? (
+      {notReady ? (
         <p className="edit-hint">
           проект {project?.name ? `«${project.name}» ` : ''}ещё индексируется — дождитесь статуса «готов»
         </p>

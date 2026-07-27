@@ -162,9 +162,7 @@ function StructurePanel() {
         subtitle="Дерево файлов и символов проекта, без LLM"
       />
 
-      {!activeId ? (
-        <p className="structure-hint">выберите готовый проект в списке выше</p>
-      ) : notReady ? (
+      {notReady ? (
         <p className="structure-hint">
           проект {project?.name ? `«${project.name}» ` : ''}ещё индексируется — дождитесь статуса «готов»
         </p>

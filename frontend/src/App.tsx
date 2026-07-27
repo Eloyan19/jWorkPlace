@@ -1,13 +1,18 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { readActiveTab, writeActiveTab } from './activeTab'
+import { readActiveProject, subscribeActiveProject } from './activeProject'
 import ChatPanel from './components/ChatPanel'
 import EditsPanel from './components/EditsPanel'
+import EmptyState from './components/EmptyState'
 import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
 import SearchPanel from './components/SearchPanel'
 import StructurePanel from './components/StructurePanel'
 import SummaryPanel from './components/SummaryPanel'
 import SupportPanel from './components/SupportPanel'
+
+const EMPTY_STATE_MESSAGE = 'Проект не выбран'
+const EMPTY_STATE_HINT = 'Выберите проиндексированный проект в панели проектов выше, чтобы начать'
 
 type Tab = 'chat' | 'summary' | 'structure' | 'search' | 'edits' | 'support'
 
@@ -30,9 +35,16 @@ const TAB_KEYS = TABS.map((t) => t.key)
 
 function App() {
   const [tab, setTab] = useState<Tab>(() => readActiveTab(TAB_KEYS, 'chat'))
+  // Активный проект — источник правды для гейта проектных вкладок (EmptyState, пока не выбран).
+  // «Поддержка сервиса» от него не зависит (см. SUPPORT_TAB).
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => readActiveProject())
   // Roving tabindex (WAI-ARIA Tabs): рефы кнопок по ключу вкладки, чтобы после смены стрелкой
   // перенести туда фокус (.focus()) — иначе фокус останется на старой (теперь tabIndex=-1) кнопке.
   const tabRefs = useRef(new Map<Tab, HTMLButtonElement>())
+
+  useEffect(() => {
+    return subscribeActiveProject(setActiveProjectId)
+  }, [])
 
   function selectTab(next: Tab) {
     setTab(next)
@@ -113,21 +125,43 @@ function App() {
         </nav>
 
         {/* Панели остаются смонтированными, неактивные скрыты (hidden) — так не теряется
-            состояние (история чата, результаты поиска, превью правки) при переключении вкладок. */}
+            состояние (история чата, результаты поиска, превью правки) при переключении вкладок.
+            Без активного проекта панели вообще не монтируем — терять там нечего, а показываем
+            единый EmptyState вместо N разных собственных заглушек панелей. */}
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'chat'}>
-          <ChatPanel />
+          {activeProjectId ? (
+            <ChatPanel />
+          ) : (
+            <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
+          )}
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'summary'}>
-          <SummaryPanel active={tab === 'summary'} />
+          {activeProjectId ? (
+            <SummaryPanel active={tab === 'summary'} />
+          ) : (
+            <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
+          )}
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'structure'}>
-          <StructurePanel />
+          {activeProjectId ? (
+            <StructurePanel />
+          ) : (
+            <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
+          )}
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'search'}>
-          <SearchPanel />
+          {activeProjectId ? (
+            <SearchPanel />
+          ) : (
+            <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
+          )}
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'edits'}>
-          <EditsPanel />
+          {activeProjectId ? (
+            <EditsPanel />
+          ) : (
+            <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
+          )}
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'support'}>
           <SupportPanel />

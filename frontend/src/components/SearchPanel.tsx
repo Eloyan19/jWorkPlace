@@ -88,9 +88,7 @@ function SearchPanel() {
         subtitle="Сырые релевантные фрагменты кода со скорами, без генерации"
       />
 
-      {!activeId ? (
-        <p className="search-hint">выберите готовый проект в списке выше</p>
-      ) : notReady ? (
+      {notReady ? (
         <p className="search-hint">
           проект {project?.name ? `«${project.name}» ` : ''}ещё индексируется — дождитесь статуса «готов»
         </p>

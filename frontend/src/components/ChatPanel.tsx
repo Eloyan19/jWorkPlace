@@ -135,9 +135,7 @@ function ChatPanel() {
     <section className="chat-panel">
       <PanelHeader title="Чат по коду" subtitle="Ответ по коду от LLM с цитатами из проекта" />
 
-      {!activeId ? (
-        <p className="chat-hint">выберите готовый проект в списке выше</p>
-      ) : notReady ? (
+      {notReady ? (
         <p className="chat-hint">
           проект {project?.name ? `«${project.name}» ` : ''}ещё индексируется — дождитесь статуса «готов»
         </p>

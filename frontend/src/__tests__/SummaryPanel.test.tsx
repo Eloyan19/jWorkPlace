@@ -45,10 +45,8 @@ describe('SummaryPanel', () => {
     vi.useRealTimers()
   })
 
-  it('без активного проекта показывает подсказку', () => {
-    render(<SummaryPanel active />)
-    expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
-  })
+  // Заглушка «нет активного проекта» переехала на уровень App.tsx (EmptyState, T08) — App вообще
+  // не монтирует SummaryPanel без активного проекта, см. App.test.tsx.
 
   it('показывает подзаголовок назначения панели', () => {
     render(<SummaryPanel active />)

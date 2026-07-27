@@ -37,10 +37,8 @@ describe('StructurePanel', () => {
     vi.restoreAllMocks()
   })
 
-  it('без активного проекта показывает подсказку', () => {
-    render(<StructurePanel />)
-    expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
-  })
+  // Заглушка «нет активного проекта» переехала на уровень App.tsx (EmptyState, T08) — App вообще
+  // не монтирует StructurePanel без активного проекта, см. App.test.tsx.
 
   it('по кнопке грузит дерево: папка и файл видны, символы — по клику', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
