@@ -199,3 +199,47 @@ describe('App — EmptyState на проектных вкладках без а�
     expect(pane.queryByText('Проект не выбран')).not.toBeInTheDocument()
   })
 })
+
+describe('App — индикатор активного проекта над tab-pane (T09)', () => {
+  // listProjects тоже должен видеть READY_PROJECT — иначе ProjectsPanel.refresh() решит, что
+  // активный id пропал из списка, и сам вызовет clearActiveProject() (гонка, не связанная с
+  // индикатором, но ломающая асинхронные проверки ниже). ProjectsPanel рендерит то же имя
+  // "repo" в своём списке — поэтому текст индикатора ищем через querySelector по его классу,
+  // а не screen.findByText (иначе "Found multiple elements").
+  beforeEach(() => {
+    vi.mocked(api.listProjects).mockResolvedValue([READY_PROJECT])
+  })
+
+  function activeProjectBarText(): string | null {
+    return document.querySelector('.active-project-name')?.textContent ?? null
+  }
+
+  it('с активным проектом на проектной вкладке показывает его имя', async () => {
+    vi.mocked(api.getProject).mockResolvedValue(READY_PROJECT)
+    window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
+    render(<App />)
+    await vi.waitFor(() => expect(activeProjectBarText()).toBe(READY_PROJECT.name))
+    expect(document.querySelector('.active-project-bar')).toBeInTheDocument()
+  })
+
+  it('без активного проекта индикатор не рендерится', () => {
+    render(<App />)
+    expect(document.querySelector('.active-project-bar')).not.toBeInTheDocument()
+  })
+
+  it('на вкладке "Поддержка сервиса" индикатор скрыт даже при активном проекте', async () => {
+    vi.mocked(api.getProject).mockResolvedValue(READY_PROJECT)
+    window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
+    render(<App />)
+    await vi.waitFor(() => expect(activeProjectBarText()).toBe(READY_PROJECT.name))
+    fireEvent.click(screen.getByRole('tab', { name: 'Поддержка сервиса' }))
+    expect(document.querySelector('.active-project-bar')).not.toBeInTheDocument()
+  })
+
+  it('при ошибке getProject индикатор не падает и показывает id', async () => {
+    vi.mocked(api.getProject).mockRejectedValue(new Error('boom'))
+    window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
+    render(<App />)
+    await vi.waitFor(() => expect(activeProjectBarText()).toBe(READY_PROJECT.id))
+  })
+})

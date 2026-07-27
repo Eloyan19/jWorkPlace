@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { readActiveTab, writeActiveTab } from './activeTab'
 import { readActiveProject, subscribeActiveProject } from './activeProject'
+import ActiveProjectIndicator from './components/ActiveProjectIndicator'
 import ChatPanel from './components/ChatPanel'
 import EditsPanel from './components/EditsPanel'
 import EmptyState from './components/EmptyState'
@@ -123,6 +124,11 @@ function App() {
             {SUPPORT_TAB.label}
           </button>
         </nav>
+
+        {/* Явно, к какому проекту относится содержимое проектных вкладок — не показываем на
+            «Поддержке сервиса» (она не про репозиторий) и не монтируем без активного проекта
+            (сам компонент тоже отдаёт null без activeId — двойная защита не помешает). */}
+        {tab !== SUPPORT_TAB.key && <ActiveProjectIndicator />}
 
         {/* Панели остаются смонтированными, неактивные скрыты (hidden) — так не теряется
             состояние (история чата, результаты поиска, превью правки) при переключении вкладок.
