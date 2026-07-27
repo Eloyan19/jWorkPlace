@@ -77,8 +77,8 @@ describe('App — вкладка "Поддержка сервиса" отдел�
   it('визуально отделена от проектных вкладок отдельным классом-разделителем', () => {
     render(<App />)
     const supportTab = screen.getByRole('tab', { name: 'Поддержка сервиса' })
-    expect(supportTab.className).toMatch(/\btab-support\b/)
-    expect(screen.getByRole('tab', { name: 'Чат' }).className).not.toMatch(/\btab-support\b/)
+    expect(supportTab.className).toMatch(/\btab-service\b/)
+    expect(screen.getByRole('tab', { name: 'Чат' }).className).not.toMatch(/\btab-service\b/)
   })
 
   it('активируется кликом и сохраняется в localStorage', () => {
@@ -190,6 +190,14 @@ describe('App — EmptyState на проектных вкладках без а�
     expect(pane.getByRole('heading', { name: 'Поддержка пользователей' })).toBeInTheDocument()
   })
 
+  it('вкладка "Справка" доступна и без активного проекта (не EmptyState)', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Справка' }))
+    const pane = within(visiblePane())
+    expect(pane.queryByText('Проект не выбран')).not.toBeInTheDocument()
+    expect(pane.getByRole('heading', { name: 'Справка' })).toBeInTheDocument()
+  })
+
   it('с активным проектом вкладка "Чат" рендерит саму панель, а не EmptyState', () => {
     vi.mocked(api.getProject).mockResolvedValue(READY_PROJECT)
     window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
@@ -236,6 +244,15 @@ describe('App — индикатор активного проекта над ta
     expect(document.querySelector('.active-project-bar')).not.toBeInTheDocument()
   })
 
+  it('на вкладке "Справка" индикатор скрыт даже при активном проекте', async () => {
+    vi.mocked(api.getProject).mockResolvedValue(READY_PROJECT)
+    window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
+    render(<App />)
+    await vi.waitFor(() => expect(activeProjectBarText()).toBe(READY_PROJECT.name))
+    fireEvent.click(screen.getByRole('tab', { name: 'Справка' }))
+    expect(document.querySelector('.active-project-bar')).not.toBeInTheDocument()
+  })
+
   it('при ошибке getProject индикатор не падает и показывает id', async () => {
     vi.mocked(api.getProject).mockRejectedValue(new Error('boom'))
     window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
@@ -245,28 +262,61 @@ describe('App — индикатор активного проекта над ta
 })
 
 describe('App — структура таб-бара (T10)', () => {
-  it('рендерит ровно 6 вкладок в одном tablist', () => {
+  it('рендерит ровно 7 вкладок в одном tablist', () => {
     render(<App />)
     const tablist = screen.getByRole('tablist', { name: 'разделы' })
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(6)
+    expect(tabs).toHaveLength(7)
     expect(tablist).toContainElement(tabs[0])
-    expect(tablist).toContainElement(tabs[5])
+    expect(tablist).toContainElement(tabs[6])
   })
 
-  it('вкладки расположены в правильном порядке', () => {
+  it('вкладки расположены в правильном порядке (проектные, затем сервисные)', () => {
     render(<App />)
     const tabs = screen.getAllByRole('tab')
     const labels = tabs.map((t) => t.textContent)
-    expect(labels).toEqual(['Чат', 'О проекте', 'Структура', 'Поиск', 'Правки', 'Поддержка сервиса'])
+    expect(labels).toEqual([
+      'Чат',
+      'О проекте',
+      'Структура',
+      'Поиск',
+      'Правки',
+      'Справка',
+      'Поддержка сервиса',
+    ])
   })
 
-  it('только последняя вкладка имеет класс tab-support', () => {
+  it('только сервисные вкладки ("Справка", "Поддержка сервиса") имеют класс tab-service', () => {
     render(<App />)
     const tabs = screen.getAllByRole('tab')
-    for (let i = 0; i < tabs.length - 1; i++) {
-      expect(tabs[i].className).not.toMatch(/\btab-support\b/)
+    for (let i = 0; i < tabs.length - 2; i++) {
+      expect(tabs[i].className).not.toMatch(/\btab-service\b/)
     }
-    expect(tabs[5].className).toMatch(/\btab-support\b/)
+    expect(tabs[5].className).toMatch(/\btab-service\b/)
+    expect(tabs[6].className).toMatch(/\btab-service\b/)
+  })
+})
+
+describe('App — вкладка "Справка" (FAQ о сервисе)', () => {
+  it('присутствует в tablist рядом с "Поддержка сервиса" (сервис-секция)', () => {
+    render(<App />)
+    const tablist = screen.getByRole('tablist', { name: 'разделы' })
+    const faqTab = screen.getByRole('tab', { name: 'Справка' })
+    expect(tablist).toContainElement(faqTab)
+    expect(faqTab.className).toMatch(/\btab-service\b/)
+  })
+
+  it('открывается кликом и показывает описания режимов + блок "Чат vs Поиск"', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Справка' }))
+    const pane = within(visiblePane())
+    expect(pane.getByText('Чат vs Поиск')).toBeInTheDocument()
+    expect(pane.getAllByText(/без генерации ответа/).length).toBeGreaterThan(0)
+  })
+
+  it('на вкладке "Справка" не рендерится ActiveProjectIndicator', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Справка' }))
+    expect(document.querySelector('.active-project-bar')).not.toBeInTheDocument()
   })
 })
