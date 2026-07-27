@@ -29,7 +29,7 @@
 | T05 | feature | P1 | 12:21 | 12:29 | ~8 | да | #14 | 🟢 | EditsPanel сегмент-переключатель; QA зелёный (pytest 366, vitest 74, Playwright S1-S5) |
 | T06 | feature | P1 | 12:30 | 12:37 | ~7 | да | #15 | 🟢 | «Поддержка сервиса» отделена (margin-left:auto); QA S1-S3 PASS; e2e-спек обновлён |
 | T07 | feature | P1 | 12:38 | 12:45 | ~7 | да | #16 | 🟢 | навигация ←/→/Home/End + roving tabindex; QA pytest 366, vitest 84, S1-S5 PASS |
-| T08 | feature | P1 | — | — | — | — | — | ⏳ | |
+| T08 | feature | P1 | 12:46 | 13:06 | ~19 | да | #17 | 🟢 | EmptyState + подписка App; убраны 6 дублей; code-reviewer PASS; QA S1-S5 |
 | T09 | feature | P1 | — | — | — | — | — | ⏳ | |
 | T10 | tests | P1 | — | — | — | — | — | ⏳ | |
 | T11 | tests | P1 | — | — | — | — | — | ⏳ | |
@@ -67,3 +67,8 @@
 - **T07** (12:38–12:45, ~7 мин, 🟢 с 1-го раза): клавиатурная навигация таб-бара (←/→ кольцом,
   Home/End, roving tabindex, фокус за активной). PR #16, code-reviewer PASS. QA: pytest 366, vitest
   84, Playwright S1-S5 PASS, S6 известный стенд. Squash-merge.
+- **T08** (12:46–13:06, ~19 мин, 🟢 с 1-го раза): единый `EmptyState` для проектных вкладок без
+  выбранного проекта + подписка App на активный проект; устранены 6 дублирующих внутрипанельных
+  заглушек. PR #17. code-reviewer **PASS** (проверил инвариант mounted-panels, отписку, T01/T07).
+  QA: pytest 366, vitest 83, Playwright S1-S5 PASS, S6 graceful-skip (backend-latency). Дольше прочих
+  (агент рефакторил 6 панелей + тесты, 68 tool-uses). Squash-merge.
