@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getProject, getStructure } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { FileNode, Project, ProjectStructure } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 const INDENT_REM = 1.05
@@ -156,7 +157,7 @@ function StructurePanel() {
 
   return (
     <section className="structure-panel">
-      <h2>Структура проекта</h2>
+      <PanelHeader title="Структура проекта" />
 
       {!activeId ? (
         <p className="structure-hint">выберите готовый проект в списке выше</p>

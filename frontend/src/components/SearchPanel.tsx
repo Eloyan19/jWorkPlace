@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { getProject, searchCode } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { Project, SearchHit, SearchResponse } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -82,7 +83,7 @@ function SearchPanel() {
 
   return (
     <section className="search-panel">
-      <h2>Поиск по коду</h2>
+      <PanelHeader title="Поиск по коду" />
 
       {!activeId ? (
         <p className="search-hint">выберите готовый проект в списке выше</p>

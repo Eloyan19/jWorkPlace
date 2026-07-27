@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPr, getProject, proposeEdit } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { EditResponse, Project } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -129,7 +130,7 @@ function EditPanel() {
 
   return (
     <section className="edit-panel">
-      <h2>Правка кода</h2>
+      <PanelHeader title="Правка кода" />
 
       {!activeId ? (
         <p className="edit-hint">выберите готовый проект в списке выше</p>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { getProject, sendChat } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { ChatMessage, ChatSource, Project } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -132,7 +133,7 @@ function ChatPanel() {
 
   return (
     <section className="chat-panel">
-      <h2>Чат по коду</h2>
+      <PanelHeader title="Чат по коду" />
 
       {!activeId ? (
         <p className="chat-hint">выберите готовый проект в списке выше</p>
