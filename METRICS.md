@@ -28,7 +28,7 @@
 | T04 | feature | P1 | 12:08 | 12:16 | ~8 | да | #13 | 🟢 | 7 подзаголовков; QA L1 зелён (pytest 366/vitest 71); L2 S1-S3 pass, S4-S6 — стенд |
 | T05 | feature | P1 | 12:21 | 12:29 | ~8 | да | #14 | 🟢 | EditsPanel сегмент-переключатель; QA зелёный (pytest 366, vitest 74, Playwright S1-S5) |
 | T06 | feature | P1 | 12:30 | 12:37 | ~7 | да | #15 | 🟢 | «Поддержка сервиса» отделена (margin-left:auto); QA S1-S3 PASS; e2e-спек обновлён |
-| T07 | feature | P1 | — | — | — | — | — | ⏳ | |
+| T07 | feature | P1 | 12:38 | 12:45 | ~7 | да | #16 | 🟢 | навигация ←/→/Home/End + roving tabindex; QA pytest 366, vitest 84, S1-S5 PASS |
 | T08 | feature | P1 | — | — | — | — | — | ⏳ | |
 | T09 | feature | P1 | — | — | — | — | — | ⏳ | |
 | T10 | tests | P1 | — | — | — | — | — | ⏳ | |
@@ -64,3 +64,6 @@
   (margin-left:auto + border-left, единый tablist сохранён), relabel. PR #15. Агент сам прогнал
   code-reviewer (PASS, замечание про лишний `key` устранил). QA: pytest 366, vitest 78, Playwright
   S1-S3 PASS (Поддержка отделена подтверждена), e2e-спек обновлён под новый label. Squash-merge.
+- **T07** (12:38–12:45, ~7 мин, 🟢 с 1-го раза): клавиатурная навигация таб-бара (←/→ кольцом,
+  Home/End, roving tabindex, фокус за активной). PR #16, code-reviewer PASS. QA: pytest 366, vitest
+  84, Playwright S1-S5 PASS, S6 известный стенд. Squash-merge.
