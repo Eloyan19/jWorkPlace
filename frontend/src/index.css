@@ -1020,17 +1020,18 @@ body {
   border-bottom-color: #2f6fed;
 }
 
-/* «Поддержка сервиса» — единственная вкладка НЕ про активный проект-репо (FAQ о самом сервисе).
-   Прижимаем к правому краю таб-бара + разделитель слева — читается как отдельная, сервис-уровневая
-   группа, а не ещё одна панель по репозиторию. Остаётся в том же <nav role="tablist">. */
-.tab-support {
+/* Сервисные вкладки («Справка», «Поддержка сервиса») — НЕ про активный проект-репо.
+   Прижимаем к правому краю таб-бара + разделитель слева перед каждой — читаются как отдельная,
+   сервис-уровневая группа, а не ещё одна панель по репозиторию. Остаются в том же
+   <nav role="tablist"> (только визуальное обособление). */
+.tab-service {
   margin-left: auto;
   padding-left: 1.25rem;
   border-left: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
-  .tab-support {
+  .tab-service {
     border-left-color: rgba(255, 255, 255, 0.14);
   }
 }
@@ -1629,5 +1630,73 @@ body {
 @media (prefers-color-scheme: dark) {
   .summary-evidence-quote {
     background: rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* --- Справка о сервисе (вкладка "Справка", статическая, без api) --- */
+.faq-panel {
+  margin-top: 2.5rem;
+  text-align: left;
+}
+
+.faq-list {
+  margin: 1.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.faq-item {
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.6rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.faq-name {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.faq-desc {
+  margin: 0;
+  font-size: 0.87rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  .faq-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Отдельный заметный блок — снимает самое частое непонимание (Чат vs Поиск). */
+.faq-callout {
+  margin-top: 1.25rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.6rem;
+  background: rgba(47, 111, 237, 0.08);
+  border-left: 3px solid #2f6fed;
+}
+
+.faq-callout-title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.faq-callout-text {
+  margin: 0;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+  .faq-callout {
+    background: rgba(47, 111, 237, 0.18);
   }
 }

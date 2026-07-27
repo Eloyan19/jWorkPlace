@@ -5,6 +5,7 @@ import ActiveProjectIndicator from './components/ActiveProjectIndicator'
 import ChatPanel from './components/ChatPanel'
 import EditsPanel from './components/EditsPanel'
 import EmptyState from './components/EmptyState'
+import FaqPanel from './components/FaqPanel'
 import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
 import SearchPanel from './components/SearchPanel'
@@ -15,7 +16,7 @@ import SupportPanel from './components/SupportPanel'
 const EMPTY_STATE_MESSAGE = 'Проект не выбран'
 const EMPTY_STATE_HINT = 'Выберите проиндексированный проект в панели проектов выше, чтобы начать'
 
-type Tab = 'chat' | 'summary' | 'structure' | 'search' | 'edits' | 'support'
+type Tab = 'chat' | 'summary' | 'structure' | 'search' | 'edits' | 'faq' | 'support'
 
 // Проектные вкладки — контекст активного проекта-репо (переключаются вместе с ним).
 const PROJECT_TABS: { key: Tab; label: string }[] = [
@@ -26,18 +27,26 @@ const PROJECT_TABS: { key: Tab; label: string }[] = [
   { key: 'edits', label: 'Правки' },
 ]
 
-// «Поддержка сервиса» — единственная НЕ привязанная к активному проекту вкладка (FAQ о самом
-// jWorkPlace). Прижата к правому краю таб-бара + разделитель, чтобы не читаться как ещё одна
-// панель по репозиторию.
-const SUPPORT_TAB: { key: Tab; label: string } = { key: 'support', label: 'Поддержка сервиса' }
+// Сервис-уровневые вкладки — НЕ привязаны к активному проекту («Справка» о самом сервисе,
+// «Поддержка сервиса» — про сам jWorkPlace, не про репозиторий). Обе прижаты к правому краю
+// таб-бара + разделитель, чтобы не читаться как ещё одна панель по репозиторию.
+const SERVICE_TABS: { key: Tab; label: string }[] = [
+  { key: 'faq', label: 'Справка' },
+  { key: 'support', label: 'Поддержка сервиса' },
+]
+const SERVICE_TAB_KEYS: readonly Tab[] = SERVICE_TABS.map((t) => t.key)
 
-const TABS = [...PROJECT_TABS, SUPPORT_TAB]
+const TABS = [...PROJECT_TABS, ...SERVICE_TABS]
 const TAB_KEYS = TABS.map((t) => t.key)
+
+function isServiceTab(key: Tab): boolean {
+  return SERVICE_TAB_KEYS.includes(key)
+}
 
 function App() {
   const [tab, setTab] = useState<Tab>(() => readActiveTab(TAB_KEYS, 'chat'))
   // Активный проект — источник правды для гейта проектных вкладок (EmptyState, пока не выбран).
-  // «Поддержка сервиса» от него не зависит (см. SUPPORT_TAB).
+  // Сервисные вкладки (см. SERVICE_TABS) от него не зависят.
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() => readActiveProject())
   // Roving tabindex (WAI-ARIA Tabs): рефы кнопок по ключу вкладки, чтобы после смены стрелкой
   // перенести туда фокус (.focus()) — иначе фокус останется на старой (теперь tabIndex=-1) кнопке.
@@ -52,8 +61,8 @@ function App() {
     writeActiveTab(next)
   }
 
-  // Один обработчик на весь tablist: стрелки/Home/End по общему кольцу TABS (project + support),
-  // с переносом на краях. Активация — та же selectTab, что и по клику (персист не расходится).
+  // Один обработчик на весь tablist: стрелки/Home/End по общему кольцу TABS (проектные +
+  // сервисные), с переносом на краях. Активация — та же selectTab, что и по клику (персист не расходится).
   function handleTabsKeyDown(e: KeyboardEvent<HTMLElement>) {
     const currentIndex = TAB_KEYS.indexOf(tab)
     let nextIndex: number
@@ -98,7 +107,8 @@ function App() {
         <ProjectsPanel />
 
         {/* Один tablist на все вкладки (клавиатура/скринридер видят их как одну группу) —
-            отделение вкладки «Поддержка сервиса» чисто визуальное (margin-left: auto + разделитель). */}
+            отделение сервисных вкладок («Справка», «Поддержка сервиса») чисто визуальное
+            (margin-left: auto + разделитель), см. .tab-service в index.css. */}
         <nav className="tabs" role="tablist" aria-label="разделы" onKeyDown={handleTabsKeyDown}>
           {PROJECT_TABS.map((t) => (
             <button
@@ -113,22 +123,26 @@ function App() {
               {t.label}
             </button>
           ))}
-          <button
-            ref={registerTabRef(SUPPORT_TAB.key)}
-            role="tab"
-            aria-selected={tab === SUPPORT_TAB.key}
-            tabIndex={tab === SUPPORT_TAB.key ? 0 : -1}
-            className={`tab tab-support${tab === SUPPORT_TAB.key ? ' tab-active' : ''}`}
-            onClick={() => selectTab(SUPPORT_TAB.key)}
-          >
-            {SUPPORT_TAB.label}
-          </button>
+          {SERVICE_TABS.map((t) => (
+            <button
+              key={t.key}
+              ref={registerTabRef(t.key)}
+              role="tab"
+              aria-selected={tab === t.key}
+              tabIndex={tab === t.key ? 0 : -1}
+              className={`tab tab-service${tab === t.key ? ' tab-active' : ''}`}
+              onClick={() => selectTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
         </nav>
 
         {/* Явно, к какому проекту относится содержимое проектных вкладок — не показываем на
-            «Поддержке сервиса» (она не про репозиторий) и не монтируем без активного проекта
-            (сам компонент тоже отдаёт null без activeId — двойная защита не помешает). */}
-        {tab !== SUPPORT_TAB.key && <ActiveProjectIndicator />}
+            сервисных вкладках («Справка»/«Поддержка сервиса», они не про репозиторий) и не
+            монтируем без активного проекта (сам компонент тоже отдаёт null без activeId —
+            двойная защита не помешает). */}
+        {!isServiceTab(tab) && <ActiveProjectIndicator />}
 
         {/* Панели остаются смонтированными, неактивные скрыты (hidden) — так не теряется
             состояние (история чата, результаты поиска, превью правки) при переключении вкладок.
@@ -168,6 +182,9 @@ function App() {
           ) : (
             <EmptyState message={EMPTY_STATE_MESSAGE} hint={EMPTY_STATE_HINT} />
           )}
+        </div>
+        <div className="tab-pane" role="tabpanel" hidden={tab !== 'faq'}>
+          <FaqPanel />
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'support'}>
           <SupportPanel />
