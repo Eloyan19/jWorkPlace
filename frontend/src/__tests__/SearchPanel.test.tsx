@@ -47,10 +47,8 @@ describe('SearchPanel', () => {
     expect(screen.getByText(/без генерации/i)).toBeInTheDocument()
   })
 
-  it('без активного проекта показывает подсказку', () => {
-    render(<SearchPanel />)
-    expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
-  })
+  // Заглушка «нет активного проекта» переехала на уровень App.tsx (EmptyState, T08) — App вообще
+  // не монтирует SearchPanel без активного проекта, см. App.test.tsx.
 
   it('для не-готового проекта показывает, что он индексируется', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')

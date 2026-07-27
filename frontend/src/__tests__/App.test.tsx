@@ -1,9 +1,28 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import * as api from '../api'
+import type { Project } from '../types'
 
 const KEY = 'jwp_active_tab'
+const ACTIVE_PROJECT_KEY = 'jwp_active_project'
+
+const READY_PROJECT: Project = {
+  id: 'proj-1',
+  url: 'https://github.com/example/repo',
+  name: 'repo',
+  status: 'ready',
+  can_edit: false,
+}
+
+// Все tab-pane остаются смонтированными разом (hidden, не unmount) — чтобы не путать
+// EmptyState активной вкладки с EmptyState скрытых, ищем текст только внутри видимой панели.
+function visiblePane(): HTMLElement {
+  const panes = document.querySelectorAll<HTMLElement>('.tab-pane')
+  const visible = Array.from(panes).find((p) => !p.hasAttribute('hidden'))
+  if (!visible) throw new Error('нет видимой tab-pane')
+  return visible
+}
 
 // App монтирует все панели разом (табы не размонтируются) — им всем нужен минимальный ответ
 // api.ts, иначе они улетают в error-состояние и засоряют вывод теста необработанными rejection.
@@ -136,5 +155,47 @@ describe('App — клавиатурная навигация по таб-бар
     const chatTab = screen.getByRole('tab', { name: 'Чат' })
     expect(chatTab).toHaveAttribute('aria-selected', 'true')
     expect(chatTab).toHaveFocus()
+  })
+})
+
+describe('App — EmptyState на проектных вкладках без активного проекта', () => {
+  it('без активного проекта вкладка "Чат" показывает единую подсказку вместо панели', () => {
+    render(<App />)
+    const pane = within(visiblePane())
+    expect(pane.getByText('Проект не выбран')).toBeInTheDocument()
+    expect(
+      pane.getByText('Выберите проиндексированный проект в панели проектов выше, чтобы начать'),
+    ).toBeInTheDocument()
+    // Форма чата (специфичная для ChatPanel) не смонтирована — панель не рендерится вовсе.
+    expect(pane.queryByPlaceholderText(/что делает проект/)).not.toBeInTheDocument()
+  })
+
+  it('без активного проекта другие проектные вкладки (Структура/Поиск/Правки) тоже показывают EmptyState', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Структура' }))
+    expect(within(visiblePane()).getByText('Проект не выбран')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Поиск' }))
+    expect(within(visiblePane()).getByText('Проект не выбран')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Правки' }))
+    expect(within(visiblePane()).getByText('Проект не выбран')).toBeInTheDocument()
+  })
+
+  it('вкладка "Поддержка сервиса" доступна и без активного проекта (не EmptyState)', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Поддержка сервиса' }))
+    const pane = within(visiblePane())
+    expect(pane.queryByText('Проект не выбран')).not.toBeInTheDocument()
+    expect(pane.getByRole('heading', { name: 'Поддержка пользователей' })).toBeInTheDocument()
+  })
+
+  it('с активным проектом вкладка "Чат" рендерит саму панель, а не EmptyState', () => {
+    vi.mocked(api.getProject).mockResolvedValue(READY_PROJECT)
+    window.localStorage.setItem(ACTIVE_PROJECT_KEY, READY_PROJECT.id)
+    render(<App />)
+    const pane = within(visiblePane())
+    expect(pane.getByPlaceholderText(/что делает проект/)).toBeInTheDocument()
+    expect(pane.queryByText('Проект не выбран')).not.toBeInTheDocument()
   })
 })

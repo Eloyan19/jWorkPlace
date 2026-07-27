@@ -167,9 +167,7 @@ function SummaryPanel({ active }: { active: boolean }) {
         )}
       </div>
 
-      {!activeId ? (
-        <p className="summary-hint">выберите готовый проект в списке выше</p>
-      ) : project === null ? (
+      {project === null ? (
         <p className="summary-hint">проверяем проект…</p>
       ) : indexing ? (
         <p className="summary-hint">
