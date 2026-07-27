@@ -130,7 +130,10 @@ function EditPanel() {
 
   return (
     <section className="edit-panel">
-      <PanelHeader title="Правка кода" />
+      <PanelHeader
+        title="Правка кода"
+        subtitle="Быстрый одношаговый патч → превью diff → PR"
+      />
 
       {!activeId ? (
         <p className="edit-hint">выберите готовый проект в списке выше</p>

@@ -83,7 +83,10 @@ function SearchPanel() {
 
   return (
     <section className="search-panel">
-      <PanelHeader title="Поиск по коду" />
+      <PanelHeader
+        title="Поиск по коду"
+        subtitle="Сырые релевантные фрагменты кода со скорами, без генерации"
+      />
 
       {!activeId ? (
         <p className="search-hint">выберите готовый проект в списке выше</p>

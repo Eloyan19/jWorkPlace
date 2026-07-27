@@ -1317,10 +1317,18 @@ body {
 
 .summary-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
   margin: 0 0 1rem;
+}
+
+.summary-header-text {
+  min-width: 0;
+}
+
+.summary-header-text .panel-subtitle {
+  margin-bottom: 0;
 }
 
 .summary-reset-button {

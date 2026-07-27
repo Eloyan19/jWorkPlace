@@ -133,7 +133,7 @@ function ChatPanel() {
 
   return (
     <section className="chat-panel">
-      <PanelHeader title="Чат по коду" />
+      <PanelHeader title="Чат по коду" subtitle="Ответ по коду от LLM с цитатами из проекта" />
 
       {!activeId ? (
         <p className="chat-hint">выберите готовый проект в списке выше</p>

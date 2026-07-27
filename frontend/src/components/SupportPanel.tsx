@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { askSupport } from '../api'
 import type { SupportResponse } from '../types'
+import PanelHeader from './PanelHeader'
 
 // Ассистент поддержки (Задание 2): глобальная вкладка (не привязана к активному проекту).
 // Отвечает по FAQ продукта jWorkPlace; опциональный ticket_id подмешивает контекст обращения
@@ -41,7 +42,10 @@ function SupportPanel() {
 
   return (
     <section className="support-panel">
-      <h2>Поддержка пользователей</h2>
+      <PanelHeader
+        title="Поддержка пользователей"
+        subtitle="Вопросы о самом сервисе jWorkPlace, не о репозитории"
+      />
       <p className="support-hint">
         Вопросы о продукте jWorkPlace. Ответы по документации (FAQ); укажите номер тикета, чтобы
         учесть контекст обращения.

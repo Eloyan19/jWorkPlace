@@ -42,6 +42,11 @@ describe('SearchPanel', () => {
     vi.restoreAllMocks()
   })
 
+  it('показывает подзаголовок про отсутствие генерации (отличает Поиск от Чата)', () => {
+    render(<SearchPanel />)
+    expect(screen.getByText(/без генерации/i)).toBeInTheDocument()
+  })
+
   it('без активного проекта показывает подсказку', () => {
     render(<SearchPanel />)
     expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()

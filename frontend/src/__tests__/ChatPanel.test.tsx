@@ -53,6 +53,11 @@ describe('ChatPanel', () => {
     expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
   })
 
+  it('показывает подзаголовок про цитаты из проекта (отличает Чат от Поиска)', () => {
+    render(<ChatPanel />)
+    expect(screen.getByText(/цитат/i)).toBeInTheDocument()
+  })
+
   it('для не-готового проекта показывает, что он индексируется', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue({ ...readyProject(), status: 'indexing' })

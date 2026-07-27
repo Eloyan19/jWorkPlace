@@ -50,6 +50,11 @@ describe('SummaryPanel', () => {
     expect(screen.getByText(/выберите готовый проект/i)).toBeInTheDocument()
   })
 
+  it('показывает подзаголовок назначения панели', () => {
+    render(<SummaryPanel active />)
+    expect(screen.getByText(/выжимка о репозитории/i)).toBeInTheDocument()
+  })
+
   it('не грузит ничего, пока вкладка не активна', async () => {
     localStorage.setItem('jwp_active_project', 'abc123')
     mockedApi.getProject.mockResolvedValue(readyProject())

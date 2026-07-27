@@ -157,7 +157,10 @@ function StructurePanel() {
 
   return (
     <section className="structure-panel">
-      <PanelHeader title="Структура проекта" />
+      <PanelHeader
+        title="Структура проекта"
+        subtitle="Дерево файлов и символов проекта, без LLM"
+      />
 
       {!activeId ? (
         <p className="structure-hint">выберите готовый проект в списке выше</p>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { confirmAgentPr, getProject, runAgent } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { AgentRunResponse, Project } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -135,7 +136,10 @@ function AgentPanel() {
 
   return (
     <section className="agent-panel">
-      <h2>Агент по файлам</h2>
+      <PanelHeader
+        title="Агент по файлам"
+        subtitle="Автономный многошаговый агент: исследует и меняет файлы"
+      />
       <p className="agent-hint-text">
         Задайте цель — агент сам изучит проект и, если нужно, подготовит правки и Pull Request.
         Примеры: «найди все использования X», «сгенерируй CHANGELOG», «проверь инварианты».

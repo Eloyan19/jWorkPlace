@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getProject, getSummary, markConceptKnown, resetKnownConcepts } from '../api'
 import { readActiveProject, subscribeActiveProject } from '../activeProject'
 import type { ConceptDetail, Project, ProjectSummary } from '../types'
+import PanelHeader from './PanelHeader'
 
 const POLL_INTERVAL_MS = 2_000
 
@@ -153,7 +154,12 @@ function SummaryPanel({ active }: { active: boolean }) {
   return (
     <section className="summary-panel">
       <div className="summary-header">
-        <h2>О проекте</h2>
+        <div className="summary-header-text">
+          <PanelHeader
+            title="О проекте"
+            subtitle="Автоматическая выжимка о репозитории и его концептах"
+          />
+        </div>
         {summary?.status === 'ready' && (
           <button type="button" className="summary-reset-button" onClick={handleReset}>
             Очистить базу знаний
