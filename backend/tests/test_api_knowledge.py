@@ -1,5 +1,5 @@
 """Тесты роутера базы знаний: гейты 404/409, кэш по head_sha, in-flight guard, error-cache
-self-heal, /read, /concepts.
+self-heal, /read, ручная пометка /concepts/{slug}/known, мягкий сброс /concepts/reset, /concepts.
 
 Полная асинхронная генерация (LLM + каскад дедупа) тестируется отдельно, напрямую через
 `generator.generate()` (см. test_knowledge.py, `asyncio.run`) — реальный event loop TestClient
@@ -229,6 +229,46 @@ def test_read_marks_concepts_known_and_is_idempotent(data_dir):
     r2 = _client().post(f"/api/knowledge/projects/{PID}/read")
     assert r2.status_code == 200
     assert r2.json() == {"ok": True}
+
+
+# --- POST .../concepts/{slug}/known ---
+
+
+def test_mark_concept_known_ok(data_dir):
+    _project_ready()
+    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
+    db.link_project_concept(PID, cid, "detail", None)
+
+    r = _client().post("/api/knowledge/concepts/x/known")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    assert db.get_concept_by_slug("x")["known"] == 1
+
+
+def test_mark_concept_known_unknown_slug_404(data_dir):
+    r = _client().post("/api/knowledge/concepts/nope/known")
+    assert r.status_code == 404
+
+
+# --- POST .../concepts/reset ---
+
+
+def test_reset_known_concepts_ok(data_dir):
+    _project_ready()
+    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
+    db.link_project_concept(PID, cid, "detail", None)
+    db.mark_concepts_known(PID)
+
+    r = _client().post("/api/knowledge/concepts/reset")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "reset": 1}
+    assert db.get_concept_by_slug("x")["known"] == 0
+
+
+def test_reset_known_concepts_zero_when_nothing_known(data_dir):
+    r = _client().post("/api/knowledge/concepts/reset")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "reset": 0}
 
 
 # --- GET /concepts ---

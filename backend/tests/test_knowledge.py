@@ -540,6 +540,57 @@ def test_mark_concepts_known_idempotent(data_dir):
     assert row2["known_at"] == known_at_1
 
 
+def test_mark_concept_known_marks_single_concept(data_dir):
+    _project_ready()
+    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
+    db.link_project_concept(PID, cid, "detail", None)
+
+    found = db.mark_concept_known("x")
+    assert found is True
+    assert db.get_concept_by_slug("x")["known"] == 1
+
+
+def test_mark_concept_known_idempotent(data_dir):
+    _project_ready()
+    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
+    db.link_project_concept(PID, cid, "detail", None)
+
+    db.mark_concept_known("x")
+    known_at_1 = db.get_concept_by_slug("x")["known_at"]
+
+    found = db.mark_concept_known("x")  # повторно — идемпотентно
+    assert found is True
+    assert db.get_concept_by_slug("x")["known_at"] == known_at_1
+
+
+def test_mark_concept_known_unknown_slug_returns_false(data_dir):
+    assert db.mark_concept_known("nope") is False
+
+
+def test_reset_known_catalog_clears_known_keeps_rows_and_links(data_dir):
+    _project_ready()
+    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
+    db.link_project_concept(PID, cid, "detail", None)
+    db.mark_concepts_known(PID)
+    assert db.get_concept_by_slug("x")["known"] == 1
+
+    reset = db.reset_known_catalog()
+
+    assert reset == 1
+    row = db.get_concept_by_slug("x")
+    assert row is not None  # строка каталога сохранена
+    assert row["known"] == 0
+    assert row["known_at"] is None
+    assert db.get_project_concepts(PID) != []  # связь проект<->концепт сохранена
+
+
+def test_reset_known_catalog_no_known_returns_zero(data_dir):
+    _project_ready()
+    db.insert_concept("x", "X", "technology", "d", None, PID)
+
+    assert db.reset_known_catalog() == 0
+
+
 def test_delete_project_clears_summary_and_links_keeps_global_concept(data_dir):
     _project_ready()
     cid = db.insert_concept("y", "Y", "pattern", "d", None, PID)
@@ -583,6 +634,7 @@ def test_render_splits_new_and_known_across_projects(data_dir):
     assert names_known == {"Known Thing"}
 
     new_item = next(c for c in dto["concepts"]["new"] if c["name"] == "New Thing")
+    assert new_item["slug"] == "new-thing"  # slug нужен фронту, чтобы адресовать ручную пометку
     assert new_item["detail"] == "раскрытие концепта"
     assert new_item["evidence"] == [{"citation": "a::b::L1-1", "quote": "q"}]
 
