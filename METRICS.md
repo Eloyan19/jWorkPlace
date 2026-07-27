@@ -30,7 +30,7 @@
 | T06 | feature | P1 | 12:30 | 12:37 | ~7 | да | #15 | 🟢 | «Поддержка сервиса» отделена (margin-left:auto); QA S1-S3 PASS; e2e-спек обновлён |
 | T07 | feature | P1 | 12:38 | 12:45 | ~7 | да | #16 | 🟢 | навигация ←/→/Home/End + roving tabindex; QA pytest 366, vitest 84, S1-S5 PASS |
 | T08 | feature | P1 | 12:46 | 13:06 | ~19 | да | #17 | 🟢 | EmptyState + подписка App; убраны 6 дублей; code-reviewer PASS; QA S1-S5 |
-| T09 | feature | P1 | — | — | — | — | — | ⏳ | |
+| T09 | feature | P1 | 13:06 | 13:16 | ~10 | да | #18 | 🟢 | ActiveProjectIndicator; code-reviewer PASS (nit: мигание, MVP-ок); QA pytest 366/vitest 87 |
 | T10 | tests | P1 | — | — | — | — | — | ⏳ | |
 | T11 | tests | P1 | — | — | — | — | — | ⏳ | |
 | T12 | tests | P1 | — | — | — | — | — | ⏳ | |
@@ -72,3 +72,6 @@
   заглушек. PR #17. code-reviewer **PASS** (проверил инвариант mounted-panels, отписку, T01/T07).
   QA: pytest 366, vitest 83, Playwright S1-S5 PASS, S6 graceful-skip (backend-latency). Дольше прочих
   (агент рефакторил 6 панелей + тесты, 68 tool-uses). Squash-merge.
+- **T09** (13:06–13:16, ~10 мин, 🟢 с 1-го раза): `ActiveProjectIndicator` — имя активного проекта
+  над проектными вкладками (своя подписка, race-guard, fallback на id). PR #18, code-reviewer PASS
+  (nit: мигание имени при Support↔проект — отложено, MVP-ок). QA: pytest 366, vitest 87, S1-S4 PASS.
