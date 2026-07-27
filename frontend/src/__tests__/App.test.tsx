@@ -46,3 +46,33 @@ describe('App — персистентность активной вкладки
     expect(screen.getByRole('tab', { name: 'Чат' })).toHaveAttribute('aria-selected', 'true')
   })
 })
+
+describe('App — вкладка "Поддержка сервиса" отделена от проектных вкладок', () => {
+  it('присутствует в общем tablist под обновлённым label', () => {
+    render(<App />)
+    const tablist = screen.getByRole('tablist', { name: 'разделы' })
+    const supportTab = screen.getByRole('tab', { name: 'Поддержка сервиса' })
+    expect(tablist).toContainElement(supportTab)
+  })
+
+  it('визуально отделена от проектных вкладок отдельным классом-разделителем', () => {
+    render(<App />)
+    const supportTab = screen.getByRole('tab', { name: 'Поддержка сервиса' })
+    expect(supportTab.className).toMatch(/\btab-support\b/)
+    expect(screen.getByRole('tab', { name: 'Чат' }).className).not.toMatch(/\btab-support\b/)
+  })
+
+  it('активируется кликом и сохраняется в localStorage', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Поддержка сервиса' }))
+    expect(screen.getByRole('tab', { name: 'Поддержка сервиса' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Чат' })).toHaveAttribute('aria-selected', 'false')
+    expect(window.localStorage.getItem(KEY)).toBe('support')
+  })
+
+  it('восстанавливается из localStorage при монтировании', () => {
+    window.localStorage.setItem(KEY, 'support')
+    render(<App />)
+    expect(screen.getByRole('tab', { name: 'Поддержка сервиса' })).toHaveAttribute('aria-selected', 'true')
+  })
+})

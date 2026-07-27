@@ -1020,6 +1020,21 @@ body {
   border-bottom-color: #2f6fed;
 }
 
+/* «Поддержка сервиса» — единственная вкладка НЕ про активный проект-репо (FAQ о самом сервисе).
+   Прижимаем к правому краю таб-бара + разделитель слева — читается как отдельная, сервис-уровневая
+   группа, а не ещё одна панель по репозиторию. Остаётся в том же <nav role="tablist">. */
+.tab-support {
+  margin-left: auto;
+  padding-left: 1.25rem;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-support {
+    border-left-color: rgba(255, 255, 255, 0.14);
+  }
+}
+
 .tab-pane[hidden] {
   display: none;
 }
