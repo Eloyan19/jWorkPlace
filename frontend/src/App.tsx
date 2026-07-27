@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { readActiveTab, writeActiveTab } from './activeTab'
 import ChatPanel from './components/ChatPanel'
 import EditsPanel from './components/EditsPanel'
@@ -30,10 +30,47 @@ const TAB_KEYS = TABS.map((t) => t.key)
 
 function App() {
   const [tab, setTab] = useState<Tab>(() => readActiveTab(TAB_KEYS, 'chat'))
+  // Roving tabindex (WAI-ARIA Tabs): рефы кнопок по ключу вкладки, чтобы после смены стрелкой
+  // перенести туда фокус (.focus()) — иначе фокус останется на старой (теперь tabIndex=-1) кнопке.
+  const tabRefs = useRef(new Map<Tab, HTMLButtonElement>())
 
   function selectTab(next: Tab) {
     setTab(next)
     writeActiveTab(next)
+  }
+
+  // Один обработчик на весь tablist: стрелки/Home/End по общему кольцу TABS (project + support),
+  // с переносом на краях. Активация — та же selectTab, что и по клику (персист не расходится).
+  function handleTabsKeyDown(e: KeyboardEvent<HTMLElement>) {
+    const currentIndex = TAB_KEYS.indexOf(tab)
+    let nextIndex: number
+    switch (e.key) {
+      case 'ArrowRight':
+        nextIndex = (currentIndex + 1) % TAB_KEYS.length
+        break
+      case 'ArrowLeft':
+        nextIndex = (currentIndex - 1 + TAB_KEYS.length) % TAB_KEYS.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = TAB_KEYS.length - 1
+        break
+      default:
+        return
+    }
+    e.preventDefault()
+    const nextKey = TAB_KEYS[nextIndex]
+    selectTab(nextKey)
+    tabRefs.current.get(nextKey)?.focus()
+  }
+
+  function registerTabRef(key: Tab) {
+    return (el: HTMLButtonElement | null) => {
+      if (el) tabRefs.current.set(key, el)
+      else tabRefs.current.delete(key)
+    }
   }
 
   return (
@@ -49,12 +86,14 @@ function App() {
 
         {/* Один tablist на все вкладки (клавиатура/скринридер видят их как одну группу) —
             отделение вкладки «Поддержка сервиса» чисто визуальное (margin-left: auto + разделитель). */}
-        <nav className="tabs" role="tablist" aria-label="разделы">
+        <nav className="tabs" role="tablist" aria-label="разделы" onKeyDown={handleTabsKeyDown}>
           {PROJECT_TABS.map((t) => (
             <button
               key={t.key}
+              ref={registerTabRef(t.key)}
               role="tab"
               aria-selected={tab === t.key}
+              tabIndex={tab === t.key ? 0 : -1}
               className={`tab${tab === t.key ? ' tab-active' : ''}`}
               onClick={() => selectTab(t.key)}
             >
@@ -62,8 +101,10 @@ function App() {
             </button>
           ))}
           <button
+            ref={registerTabRef(SUPPORT_TAB.key)}
             role="tab"
             aria-selected={tab === SUPPORT_TAB.key}
+            tabIndex={tab === SUPPORT_TAB.key ? 0 : -1}
             className={`tab tab-support${tab === SUPPORT_TAB.key ? ' tab-active' : ''}`}
             onClick={() => selectTab(SUPPORT_TAB.key)}
           >
