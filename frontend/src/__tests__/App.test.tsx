@@ -243,3 +243,30 @@ describe('App — индикатор активного проекта над ta
     await vi.waitFor(() => expect(activeProjectBarText()).toBe(READY_PROJECT.id))
   })
 })
+
+describe('App — структура таб-бара (T10)', () => {
+  it('рендерит ровно 6 вкладок в одном tablist', () => {
+    render(<App />)
+    const tablist = screen.getByRole('tablist', { name: 'разделы' })
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(6)
+    expect(tablist).toContainElement(tabs[0])
+    expect(tablist).toContainElement(tabs[5])
+  })
+
+  it('вкладки расположены в правильном порядке', () => {
+    render(<App />)
+    const tabs = screen.getAllByRole('tab')
+    const labels = tabs.map((t) => t.textContent)
+    expect(labels).toEqual(['Чат', 'О проекте', 'Структура', 'Поиск', 'Правки', 'Поддержка сервиса'])
+  })
+
+  it('только последняя вкладка имеет класс tab-support', () => {
+    render(<App />)
+    const tabs = screen.getAllByRole('tab')
+    for (let i = 0; i < tabs.length - 1; i++) {
+      expect(tabs[i].className).not.toMatch(/\btab-support\b/)
+    }
+    expect(tabs[5].className).toMatch(/\btab-support\b/)
+  })
+})
