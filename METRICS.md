@@ -27,7 +27,7 @@
 | T03 | refactor | P6 | 12:06 | 12:08 | ~2 | да | — | 🟢 | commit d2e2d7f; PanelHeader в 4 панелях; 68 vitest |
 | T04 | feature | P1 | 12:08 | 12:16 | ~8 | да | #13 | 🟢 | 7 подзаголовков; QA L1 зелён (pytest 366/vitest 71); L2 S1-S3 pass, S4-S6 — стенд |
 | T05 | feature | P1 | 12:21 | 12:29 | ~8 | да | #14 | 🟢 | EditsPanel сегмент-переключатель; QA зелёный (pytest 366, vitest 74, Playwright S1-S5) |
-| T06 | feature | P1 | — | — | — | — | — | ⏳ | |
+| T06 | feature | P1 | 12:30 | 12:37 | ~7 | да | #15 | 🟢 | «Поддержка сервиса» отделена (margin-left:auto); QA S1-S3 PASS; e2e-спек обновлён |
 | T07 | feature | P1 | — | — | — | — | — | ⏳ | |
 | T08 | feature | P1 | — | — | — | — | — | ⏳ | |
 | T09 | feature | P1 | — | — | — | — | — | ⏳ | |
@@ -60,3 +60,7 @@
 - **T05** (12:21–12:29, ~8 мин, 🟢 с 1-го раза): `EditsPanel` — сегмент-переключатель «Быстрая
   правка»↔«Агент по файлам» вместо стопки. PR #14. QA: pytest 366, vitest 74, Playwright S1-S5 PASS
   (backend поднялся), S6 — известный стенд. Squash-merge. Новый git-флоу отработал чисто (без дивергенции).
+- **T06** (12:30–12:37, ~7 мин, 🟢 с 1-го раза): «Поддержка сервиса» отделена от проектных вкладок
+  (margin-left:auto + border-left, единый tablist сохранён), relabel. PR #15. Агент сам прогнал
+  code-reviewer (PASS, замечание про лишний `key` устранил). QA: pytest 366, vitest 78, Playwright
+  S1-S3 PASS (Поддержка отделена подтверждена), e2e-спек обновлён под новый label. Squash-merge.
