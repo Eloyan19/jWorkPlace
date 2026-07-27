@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { readActiveTab, writeActiveTab } from './activeTab'
-import AgentPanel from './components/AgentPanel'
 import ChatPanel from './components/ChatPanel'
-import EditPanel from './components/EditPanel'
+import EditsPanel from './components/EditsPanel'
 import HealthIndicator from './components/HealthIndicator'
 import ProjectsPanel from './components/ProjectsPanel'
 import SearchPanel from './components/SearchPanel'
@@ -71,10 +70,7 @@ function App() {
           <SearchPanel />
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'edits'}>
-          {/* «Правка кода» — быстрый одношаговый патч по известному месту;
-              «Агент по файлам» — автономный многошаговый (исследует, создаёт файлы). */}
-          <EditPanel />
-          <AgentPanel />
+          <EditsPanel />
         </div>
         <div className="tab-pane" role="tabpanel" hidden={tab !== 'support'}>
           <SupportPanel />
