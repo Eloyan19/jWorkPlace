@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { readActiveTab, writeActiveTab } from './activeTab'
 import AgentPanel from './components/AgentPanel'
 import ChatPanel from './components/ChatPanel'
 import EditPanel from './components/EditPanel'
@@ -20,8 +21,15 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'support', label: 'Поддержка' },
 ]
 
+const TAB_KEYS = TABS.map((t) => t.key)
+
 function App() {
-  const [tab, setTab] = useState<Tab>('chat')
+  const [tab, setTab] = useState<Tab>(() => readActiveTab(TAB_KEYS, 'chat'))
+
+  function selectTab(next: Tab) {
+    setTab(next)
+    writeActiveTab(next)
+  }
 
   return (
     <div className="app">
@@ -41,7 +49,7 @@ function App() {
               role="tab"
               aria-selected={tab === t.key}
               className={`tab${tab === t.key ? ' tab-active' : ''}`}
-              onClick={() => setTab(t.key)}
+              onClick={() => selectTab(t.key)}
             >
               {t.label}
             </button>
