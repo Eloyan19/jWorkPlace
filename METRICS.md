@@ -31,9 +31,9 @@
 | T07 | feature | P1 | 12:38 | 12:45 | ~7 | да | #16 | 🟢 | навигация ←/→/Home/End + roving tabindex; QA pytest 366, vitest 84, S1-S5 PASS |
 | T08 | feature | P1 | 12:46 | 13:06 | ~19 | да | #17 | 🟢 | EmptyState + подписка App; убраны 6 дублей; code-reviewer PASS; QA S1-S5 |
 | T09 | feature | P1 | 13:06 | 13:16 | ~10 | да | #18 | 🟢 | ActiveProjectIndicator; code-reviewer PASS (nit: мигание, MVP-ок); QA pytest 366/vitest 87 |
-| T10 | tests | P1 | — | — | — | — | — | ⏳ | |
-| T11 | tests | P1 | — | — | — | — | — | ⏳ | |
-| T12 | tests | P1 | — | — | — | — | — | ⏳ | |
+| T10 | tests | P1 | 13:17 | 13:18 | ~2 | да | — | 🟢 | commit 71c68bb; 3 теста структуры вкладок; 90 vitest |
+| T11 | tests | P1 | 13:18 | 13:20 | ~1 | да | — | 🟢 | commit c79abbe; 3 теста PanelHeader; 93 vitest |
+| T12 | tests | P1 | 13:20 | 13:22 | ~2 | да | — | 🟢 | commit 8336f46; guard support без проекта; 367 pytest |
 | T13 | refactor | P6 | — | — | — | — | — | ⏳ | |
 | T14 | docs | P6 | — | — | — | — | — | ⏳ | |
 | T15 | docs | P6 | — | — | — | — | — | ⏳ | |
@@ -75,3 +75,7 @@
 - **T09** (13:06–13:16, ~10 мин, 🟢 с 1-го раза): `ActiveProjectIndicator` — имя активного проекта
   над проектными вкладками (своя подписка, race-guard, fallback на id). PR #18, code-reviewer PASS
   (nit: мигание имени при Support↔проект — отложено, MVP-ок). QA: pytest 366, vitest 87, S1-S4 PASS.
+- **T10–T12** (13:17–13:22, ~5 мин на три, все 🟢 с 1-го раза): недостающие тесты, прямой commit в
+  master (не-фичи). T10 — vitest структуры вкладок (набор/порядок/отделение Поддержки, 90 vitest);
+  T11 — vitest PanelHeader (title/subtitle, 93 vitest); T12 — pytest guard независимости поддержки от
+  проекта (367 pytest, контракт подтверждён). Быстрые: один файл каждый, review-гейт не срабатывал.
