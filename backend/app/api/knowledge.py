@@ -2,11 +2,10 @@
 
 `GET .../summary` — lazy-генерация: если сохранённая выжимка устарела (head_sha разошёлся с
 `projects.head_sha` после reindex) или её ещё нет, ставит фоновую генерацию под guard'ом и
-отдаёт `{"status": "generating"}` — фронт поллит. `POST .../read` — авто-пометка известных
-концептов при открытии панели выжимки (идемпотентно, оставлена как есть для обратной
-совместимости — фронт больше не обязан её звать). `POST /concepts/{slug}/known` — ручная
-пометка ОДНОГО концепта. `POST /concepts/reset` — мягкий сброс known по всему каталогу (строки
-и связи не удаляются). `GET /concepts` — глобальный каталог «что я знаю» (опциональная панель).
+отдаёт `{"status": "generating"}` — фронт поллит. `POST /concepts/{slug}/known` — ручная
+пометка ОДНОГО концепта (единственный способ пометки — авто/bulk-пометка убрана). `POST
+/concepts/reset` — мягкий сброс known по всему каталогу (строки и связи не удаляются).
+`GET /concepts` — глобальный каталог «что я знаю» (опциональная панель).
 
 Генерация — 1 вызов LLM + немного embed_query (лёгкая операция), НЕ участвует в
 `Semaphore(1)` пайплайна индексации — не блокируем реиндексацию других проектов. KB строго
@@ -79,20 +78,10 @@ async def get_summary(project_id: str) -> dict:
     return {"status": "generating"}
 
 
-@router.post("/projects/{project_id}/read")
-async def mark_read(project_id: str) -> dict:
-    """Пометить концепты этого проекта известными — идемпотентно, безопасно вызывать повторно."""
-    row = db.get_project(project_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Проект не найден.")
-    await asyncio.to_thread(db.mark_concepts_known, project_id)
-    return {"ok": True}
-
-
 @router.post("/concepts/{slug}/known")
 async def mark_concept_known(slug: str) -> dict:
-    """Ручная пометка ОДНОГО концепта известным (альтернатива авто-`/read` для всего проекта
-    сразу) — фронт зовёт по клику на конкретный концепт в списке «новых»."""
+    """Ручная пометка ОДНОГО концепта известным — фронт зовёт по клику на конкретный концепт
+    в списке «новых»."""
     found = await asyncio.to_thread(db.mark_concept_known, slug)
     if not found:
         raise HTTPException(status_code=404, detail="Концепт не найден.")

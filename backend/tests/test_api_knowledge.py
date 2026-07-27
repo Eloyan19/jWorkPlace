@@ -1,5 +1,5 @@
 """Тесты роутера базы знаний: гейты 404/409, кэш по head_sha, in-flight guard, error-cache
-self-heal, /read, ручная пометка /concepts/{slug}/known, мягкий сброс /concepts/reset, /concepts.
+self-heal, ручная пометка /concepts/{slug}/known, мягкий сброс /concepts/reset, /concepts.
 
 Полная асинхронная генерация (LLM + каскад дедупа) тестируется отдельно, напрямую через
 `generator.generate()` (см. test_knowledge.py, `asyncio.run`) — реальный event loop TestClient
@@ -208,29 +208,6 @@ def test_run_generate_unexpected_exception_sets_internal_error_without_leaking(d
     assert knowledge_api._gen_errors[PID] == "internal_error"  # без repr исключения
 
 
-# --- POST .../read ---
-
-
-def test_read_unknown_project_404(data_dir):
-    r = _client().post(f"/api/knowledge/projects/{PID}/read")
-    assert r.status_code == 404
-
-
-def test_read_marks_concepts_known_and_is_idempotent(data_dir):
-    _project_ready()
-    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
-    db.link_project_concept(PID, cid, "detail", None)
-
-    r1 = _client().post(f"/api/knowledge/projects/{PID}/read")
-    assert r1.status_code == 200
-    assert r1.json() == {"ok": True}
-    assert db.get_concept_by_slug("x")["known"] == 1
-
-    r2 = _client().post(f"/api/knowledge/projects/{PID}/read")
-    assert r2.status_code == 200
-    assert r2.json() == {"ok": True}
-
-
 # --- POST .../concepts/{slug}/known ---
 
 
@@ -257,7 +234,7 @@ def test_reset_known_concepts_ok(data_dir):
     _project_ready()
     cid = db.insert_concept("x", "X", "technology", "d", None, PID)
     db.link_project_concept(PID, cid, "detail", None)
-    db.mark_concepts_known(PID)
+    db.mark_concept_known("x")
 
     r = _client().post("/api/knowledge/concepts/reset")
     assert r.status_code == 200
@@ -278,7 +255,7 @@ def test_list_concepts_returns_only_known(data_dir):
     a_id = db.insert_concept("a", "A", "technology", "d", None, "p1")
     db.insert_concept("b", "B", "technology", "d", None, "p1")
     db.link_project_concept("p1", a_id, "detail", None)
-    db.mark_concepts_known("p1")  # "b" не привязан к project_concepts -> не помечается
+    db.mark_concept_known("a")  # "b" не привязан к project_concepts -> не помечается
 
     r = _client().get("/api/knowledge/concepts")
     assert r.status_code == 200

@@ -522,22 +522,7 @@ def test_generate_gray_zone_rejected_by_judge_mints_new_concept(data_dir, monkey
     assert {row["slug"] for row in catalog} == {"rest-api", "http-api"}  # новый заминчен отдельно
 
 
-# --- db: mark_concepts_known / delete_project ---
-
-
-def test_mark_concepts_known_idempotent(data_dir):
-    _project_ready()
-    cid = db.insert_concept("x", "X", "technology", "d", None, PID)
-    db.link_project_concept(PID, cid, "detail", None)
-
-    db.mark_concepts_known(PID)
-    row = db.get_concept_by_slug("x")
-    assert row["known"] == 1
-    known_at_1 = row["known_at"]
-
-    db.mark_concepts_known(PID)  # повторно — идемпотентно
-    row2 = db.get_concept_by_slug("x")
-    assert row2["known_at"] == known_at_1
+# --- db: mark_concept_known / delete_project ---
 
 
 def test_mark_concept_known_marks_single_concept(data_dir):
@@ -571,7 +556,7 @@ def test_reset_known_catalog_clears_known_keeps_rows_and_links(data_dir):
     _project_ready()
     cid = db.insert_concept("x", "X", "technology", "d", None, PID)
     db.link_project_concept(PID, cid, "detail", None)
-    db.mark_concepts_known(PID)
+    db.mark_concept_known("x")
     assert db.get_concept_by_slug("x")["known"] == 1
 
     reset = db.reset_known_catalog()
@@ -616,7 +601,7 @@ def test_render_splits_new_and_known_across_projects(data_dir):
 
     cid_known = db.insert_concept("known-thing", "Known Thing", "technology", "d2", None, other_pid)
     db.link_project_concept(other_pid, cid_known, "d2", None)
-    db.mark_concepts_known(other_pid)
+    db.mark_concept_known("known-thing")
 
     cid_new = db.insert_concept("new-thing", "New Thing", "feature", "d1", None, PID)
     db.link_project_concept(PID, cid_new, "раскрытие концепта", json.dumps([{"citation": "a::b::L1-1", "quote": "q"}]))

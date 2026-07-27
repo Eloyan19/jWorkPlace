@@ -557,19 +557,8 @@ def get_project_concepts(project_id: str) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def mark_concepts_known(project_id: str) -> None:
-    """Пометить все концепты этого проекта известными (авто при открытии панели выжимки).
-    Идемпотентно: уже известные (known=1) не трогает `known_at`."""
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE concepts SET known = 1, known_at = COALESCE(known_at, datetime('now')) "
-            "WHERE known = 0 AND id IN (SELECT concept_id FROM project_concepts WHERE project_id = ?)",
-            (project_id,),
-        )
-
-
 def mark_concept_known(slug: str) -> bool:
-    """Пометить ОДИН концепт известным вручную (ручная альтернатива авто-`mark_concepts_known`).
+    """Пометить ОДИН концепт известным вручную (ручная per-concept пометка из панели выжимки).
     Идемпотентно: уже известный (known=1) не трогает `known_at`. Возвращает True, если slug
     найден в каталоге (независимо от того, потребовалось ли реальное изменение строки)."""
     with get_conn() as conn:
