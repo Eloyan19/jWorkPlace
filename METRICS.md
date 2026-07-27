@@ -110,3 +110,14 @@
   auto-классификатором. Перешёл на «ветка от `origin/master` на каждую задачу; не-фичи — `push
   HEAD:master` fast-forward'ом, фичи — PR». Дальше дивергенций не было. Учтено как накладные, не как
   провал задачи.
+
+## Дополнительно (после пула, по запросу пользователя)
+- **T17 — feature — вкладка «Справка» (FAQ)** (18:07–18:21, ~14 мин, 🟢 с 1-го раза). Статическая
+  сервис-вкладка `FaqPanel` с описанием каждого режима + блок «Чат vs Поиск». Сервис-секция
+  обобщена (`SERVICE_TABS=[faq, support]`). PR **#19**. code-reviewer PASS (2 нита устранены сразу).
+  QA: vitest 98 зелёные, Playwright S1-S5 PASS (Справка видна), S6 skip; pytest пропущен агентом
+  (env-конфликт, фича чисто фронтовая — backend не тронут). Squash-merge.
+- **Deploy на прод** (~18:22). `deploy/redeploy.sh all` → backend GIT_SHA=`964704e`+рестарт,
+  Vite-build → `/var/www/jworkplace`, nginx reload. Прод-smoke: health
+  `{"status":"ok","version":"964704e"}` (версия = релизный коммит); прод-бандл содержит новые
+  лейблы вкладок. Реорганизация + FAQ **живут на https://jwork.jorchik.com**. 🟢
