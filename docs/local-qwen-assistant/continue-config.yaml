@@ -1,0 +1,35 @@
+# Пример глобального конфига Continue → скопировать в ~/.continue/config.yaml и поправить под свои
+# модели/память. Формат config.yaml (schema v1). Правила проекта Continue берёт из .continue/rules/
+# репозитория автоматически — здесь их дублировать не нужно.
+name: local-qwen
+version: 0.0.1
+schema: v1
+
+models:
+  # ── Чат / правки (instruct, крупнее) ────────────────────────────────────────
+  - name: qwen chat
+    provider: ollama
+    model: qwen2.5-coder:7b
+    roles: [chat, edit, apply]
+    defaultCompletionOptions:
+      contextLength: 16384   # ⚠️ иначе Ollama по умолчанию даст 2048–4096 и «забудет» файлы
+      temperature: 0.2       # код — детерминированная задача; 0.4–0.7 только для «поизучать»
+      topP: 0.9
+
+  # ── Автокомплит (FIM, обязательно -base) ────────────────────────────────────
+  - name: qwen autocomplete
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base
+    roles: [autocomplete]
+    defaultCompletionOptions:
+      contextLength: 4096    # автокомплиту большой контекст не нужен → быстрее
+      temperature: 0.1
+      topP: 0.9
+
+  # ── Эмбеддинги для @codebase (тот же nomic, что в jWorkPlace) ────────────────
+  - name: nomic embed
+    provider: ollama
+    model: nomic-embed-text
+    roles: [embed]
+
+# @codebase индексирует репо эмбеддингами — включи его в чате для «где вызывается X / что делает Y».

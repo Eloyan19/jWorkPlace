@@ -1,0 +1,14 @@
+# Чат-модель с зашитым большим контекстом (чтобы не поднимать num_ctx глобально и не тормозить
+# автокомплит). Собрать:  ollama create qwen-chat-16k -f docs/local-qwen-assistant/Modelfile.qwen-chat
+# Затем в расширении указать модель qwen-chat-16k для роли чата.
+FROM qwen2.5-coder:7b
+
+# Контекст: 16384 (подними до 32768 если память позволяет; qwen2.5-coder держит 32K нативно).
+# ⚠️ Больше num_ctx = больше KV-cache. Не влезло в VRAM → сгрузка в RAM → скорость падает в 20–50×.
+PARAMETER num_ctx 16384
+
+# Детерминированность под код.
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.05
