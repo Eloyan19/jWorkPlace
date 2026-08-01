@@ -1,0 +1,407 @@
+{
+  "total": 50,
+  "real_or_faq_derived_count": 12,
+  "real_or_faq_derived_ratio": 0.24,
+  "examples": [
+    {
+      "split": "train",
+      "index": 0,
+      "id": "R1",
+      "source": "real",
+      "category": "indexing",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 1,
+      "id": "R2",
+      "source": "real",
+      "category": "pr_edits",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 2,
+      "id": "R3",
+      "source": "real",
+      "category": "indexing",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 3,
+      "id": "R4",
+      "source": "real",
+      "category": "chat_grounding",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 4,
+      "id": "F1",
+      "source": "faq_derived",
+      "category": "other",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 5,
+      "id": "F2",
+      "source": "faq_derived",
+      "category": "repo_connect",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 6,
+      "id": "F3",
+      "source": "faq_derived",
+      "category": "indexing",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 7,
+      "id": "F4",
+      "source": "faq_derived",
+      "category": "chat_grounding",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 8,
+      "id": "F5",
+      "source": "faq_derived",
+      "category": "pr_edits",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 9,
+      "id": "F7",
+      "source": "faq_derived",
+      "category": "other",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 10,
+      "id": "F8",
+      "source": "faq_derived",
+      "category": "repo_connect",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 11,
+      "id": "I1",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 12,
+      "id": "I3",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 13,
+      "id": "I4",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 14,
+      "id": "I6",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 15,
+      "id": "I7",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 16,
+      "id": "I8",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 17,
+      "id": "I9",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 18,
+      "id": "P1",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 19,
+      "id": "P3",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 20,
+      "id": "P5",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 21,
+      "id": "P6",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 22,
+      "id": "P7",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 23,
+      "id": "P8",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 24,
+      "id": "C1",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 25,
+      "id": "C2",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 26,
+      "id": "C4",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 27,
+      "id": "C5",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 28,
+      "id": "C7",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 29,
+      "id": "RC2",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 30,
+      "id": "RC3",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 31,
+      "id": "RC5",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 32,
+      "id": "RC6",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 33,
+      "id": "A1",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 34,
+      "id": "A3",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 35,
+      "id": "A4",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "high"
+    },
+    {
+      "split": "train",
+      "index": 36,
+      "id": "A5",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 37,
+      "id": "A6",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "medium"
+    },
+    {
+      "split": "train",
+      "index": 38,
+      "id": "O1",
+      "source": "synthetic",
+      "category": "other",
+      "priority": "low"
+    },
+    {
+      "split": "train",
+      "index": 39,
+      "id": "O2",
+      "source": "synthetic",
+      "category": "other",
+      "priority": "low"
+    },
+    {
+      "split": "eval",
+      "index": 0,
+      "id": "F6",
+      "source": "faq_derived",
+      "category": "other",
+      "priority": "high"
+    },
+    {
+      "split": "eval",
+      "index": 1,
+      "id": "I2",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "high"
+    },
+    {
+      "split": "eval",
+      "index": 2,
+      "id": "I5",
+      "source": "synthetic",
+      "category": "indexing",
+      "priority": "low"
+    },
+    {
+      "split": "eval",
+      "index": 3,
+      "id": "P2",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "high"
+    },
+    {
+      "split": "eval",
+      "index": 4,
+      "id": "P4",
+      "source": "synthetic",
+      "category": "pr_edits",
+      "priority": "low"
+    },
+    {
+      "split": "eval",
+      "index": 5,
+      "id": "C3",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "low"
+    },
+    {
+      "split": "eval",
+      "index": 6,
+      "id": "C6",
+      "source": "synthetic",
+      "category": "chat_grounding",
+      "priority": "high"
+    },
+    {
+      "split": "eval",
+      "index": 7,
+      "id": "RC1",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "high"
+    },
+    {
+      "split": "eval",
+      "index": 8,
+      "id": "RC4",
+      "source": "synthetic",
+      "category": "repo_connect",
+      "priority": "low"
+    },
+    {
+      "split": "eval",
+      "index": 9,
+      "id": "A2",
+      "source": "synthetic",
+      "category": "account",
+      "priority": "medium"
+    }
+  ]
+}

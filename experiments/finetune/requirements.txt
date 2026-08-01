@@ -1,0 +1,4 @@
+# Зависимости для локального запуска validate.py и baseline_runner.py.
+# validate.py — только stdlib, зависимостей не требует.
+# baseline_runner.py — OpenAI-совместимый клиент (работает и с Ollama /v1, и с DeepSeek, и с OpenAI).
+openai>=1.30,<2
