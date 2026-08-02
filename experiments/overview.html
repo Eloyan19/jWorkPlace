@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<title>Экономика инференса · 4 трека</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --panel-2: #f0f2f5;
+    --ink: #12161d;
+    --ink-2: #3d4653;
+    --muted: #697485;
+    --border: #e2e5ea;
+    --border-strong: #cfd4dc;
+    --accent: #4a5ae8;
+    --accent-soft: #eceefb;
+    --good: #12866a;
+    --good-soft: #e2f2ec;
+    --warn: #b9722a;
+    --warn-soft: #f6ecdf;
+    --neutral-bar: #9aa4b2;
+    --shadow: 0 1px 2px rgba(18,22,29,.04), 0 8px 24px -12px rgba(18,22,29,.12);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1017;
+      --panel: #161b23;
+      --panel-2: #1c222c;
+      --ink: #e8ecf3;
+      --ink-2: #b9c1cd;
+      --muted: #7f8b9c;
+      --border: #262d38;
+      --border-strong: #333c49;
+      --accent: #7d8bff;
+      --accent-soft: #1e2440;
+      --good: #34c99a;
+      --good-soft: #12332a;
+      --warn: #e2a153;
+      --warn-soft: #33261544;
+      --neutral-bar: #58637380;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f0f2f5; --ink: #12161d; --ink-2: #3d4653;
+    --muted: #697485; --border: #e2e5ea; --border-strong: #cfd4dc; --accent: #4a5ae8;
+    --accent-soft: #eceefb; --good: #12866a; --good-soft: #e2f2ec; --warn: #b9722a;
+    --warn-soft: #f6ecdf; --neutral-bar: #9aa4b2;
+    --shadow: 0 1px 2px rgba(18,22,29,.04), 0 8px 24px -12px rgba(18,22,29,.12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1017; --panel: #161b23; --panel-2: #1c222c; --ink: #e8ecf3; --ink-2: #b9c1cd;
+    --muted: #7f8b9c; --border: #262d38; --border-strong: #333c49; --accent: #7d8bff;
+    --accent-soft: #1e2440; --good: #34c99a; --good-soft: #12332a; --warn: #e2a153;
+    --warn-soft: #33261544; --neutral-bar: #58637380;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: clamp(20px, 4vw, 56px) clamp(16px, 4vw, 40px) 80px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0;
+  }
+  h1 {
+    font-size: clamp(30px, 5.2vw, 50px); line-height: 1.04; letter-spacing: -.025em;
+    font-weight: 800; margin: 14px 0 0; text-wrap: balance; max-width: 20ch;
+  }
+  h1 em { color: var(--accent); font-style: normal; }
+  .dek { font-size: clamp(15px, 2vw, 18px); color: var(--ink-2); margin: 16px 0 0; max-width: 62ch; }
+
+  /* header bar */
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .toggle {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-2); background: var(--panel); border: 1px solid var(--border-strong);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: border-color .15s, color .15s;
+  }
+  .toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px;
+  }
+  .chip {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .02em;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 11px; color: var(--ink-2);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: clamp(40px, 6vw, 64px); }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .sec-head h2 { font-size: 21px; letter-spacing: -.01em; margin: 0; font-weight: 700; }
+  .sec-head .note { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  /* ---- thesis cost chart ---- */
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .costchart { padding: clamp(18px, 3vw, 28px); }
+  .costchart .legend {
+    display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 22px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  }
+  .costchart .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .costrow { display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: center; }
+  .costrow + .costrow { margin-top: 16px; }
+  .costrow .rlabel { min-width: 0; }
+  .costrow .rname { font-weight: 600; font-size: 14px; }
+  .costrow .rbasis { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: .03em; text-transform: uppercase; }
+  .track {
+    position: relative; height: 34px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .baseline { position: absolute; top: -6px; bottom: -6px; left: 20%; width: 2px; background: var(--border-strong); z-index: 2; }
+  .baseline::after {
+    content: "1×"; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+  }
+  .fill {
+    position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 10px;
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: #fff;
+    font-variant-numeric: tabular-nums; min-width: 42px;
+    transition: width .5s cubic-bezier(.2,.7,.2,1);
+  }
+  .fill.warn { background: var(--warn); }
+  .fill.good { background: var(--good); }
+  .fill.neutral { background: var(--neutral-bar); color: var(--ink); }
+  .costfoot { margin-top: 22px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 16px; }
+
+  /* ---- track cards ---- */
+  .tracks { display: grid; gap: 18px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); padding: clamp(18px, 3vw, 26px);
+    display: grid; grid-template-columns: 1fr; gap: 18px;
+  }
+  @media (min-width: 720px) { .card { grid-template-columns: 1.15fr 1fr; } }
+  .card .num {
+    font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .1em; font-weight: 600;
+  }
+  .card h3 { font-size: 20px; margin: 8px 0 0; letter-spacing: -.01em; }
+  .card .branch { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; word-break: break-all; }
+  .qa { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .qa .q { font-size: 14.5px; color: var(--ink-2); }
+  .qa .q b { color: var(--ink); }
+  .axis-pill {
+    align-self: flex-start; font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px; padding: 4px 9px;
+  }
+  .lesson {
+    margin-top: 16px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5;
+    border-left: 2px solid var(--accent); padding-left: 12px;
+  }
+  .lesson b { color: var(--ink); }
+
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; align-content: start; }
+  .metric { background: var(--panel); padding: 12px 14px; }
+  .metric .mk { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .metric .mv { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .metric .mv small { font-size: 12.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .metric .mv.good { color: var(--good); }
+  .metric .mv.warn { color: var(--warn); }
+
+  .tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 5px; letter-spacing: .02em; }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+
+  /* ---- cascade ---- */
+  .cascade { display: grid; gap: 0; }
+  .stage {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; position: relative;
+  }
+  .stage + .stage { margin-top: 30px; }
+  .stage + .stage::before {
+    content: "▼"; position: absolute; top: -26px; left: 26px; color: var(--accent);
+    font-size: 13px; line-height: 1;
+  }
+  .stage .st-name { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .stage .st-body { margin-top: 7px; font-size: 14px; color: var(--ink-2); }
+  .stage .st-body b { color: var(--ink); }
+  .stage .st-body .lane { display: block; padding-left: 16px; position: relative; margin-top: 4px; }
+  .stage .st-body .lane::before { content: "└─"; position: absolute; left: 0; color: var(--muted); font-family: var(--mono); }
+
+  /* ---- lessons list ---- */
+  .lessons { display: grid; gap: 12px; }
+  .lrow { display: grid; grid-template-columns: 30px 1fr; gap: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; padding: 15px 17px; box-shadow: var(--shadow); }
+  .lrow .ln { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 700; }
+  .lrow .lt { font-size: 14px; color: var(--ink-2); }
+  .lrow .lt b { color: var(--ink); }
+
+  .limits { font-size: 13px; color: var(--muted); border: 1px dashed var(--border-strong); border-radius: 11px; padding: 18px 20px; }
+  .limits ul { margin: 10px 0 0; padding-left: 18px; }
+  .limits li { margin: 5px 0; }
+  .limits b { color: var(--ink-2); }
+
+  footer { margin-top: 48px; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .03em; border-top: 1px solid var(--border); padding-top: 18px; }
+
+  @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">experiments/ · экономика инференса</p>
+    </div>
+    <button class="toggle" id="themeBtn" aria-label="Переключить тему">◐ тема</button>
+  </div>
+
+  <header>
+    <h1>Как получить надёжный ответ, <em>не переплачивая</em> большой LLM</h1>
+    <p class="dek">
+      Четыре учебных трека — не разрозненные опыты, а одна линия. Все решают одну задачу
+      (классификация тикета поддержки), на одном тест-сете (20 входов), на одной модели, через общее
+      ядро. Поэтому числа сопоставимы, а выводы складываются в один каскад. Сквозная мысль:
+      <b>сила сигнала пропорциональна его цене</b>.
+    </p>
+    <div class="meta-row">
+      <span class="chip"><b>4</b> трека</span>
+      <span class="chip"><b>20</b> тикетов · correct / borderline / noisy</span>
+      <span class="chip">модель <b>deepseek-v4-flash</b> (+ pro в routing)</span>
+      <span class="chip">Ур.1 <b>nomic-embed</b> в microfirst</span>
+      <span class="chip">ядро <b>confidence_harness.py</b></span>
+    </div>
+  </header>
+
+  <!-- THESIS VIZ -->
+  <section>
+    <div class="sec-head">
+      <h2>Что каждый приём делает со стоимостью</h2>
+      <span class="note">относительно базлайна СВОЕГО трека · шкала линейная 0–5×</span>
+    </div>
+    <div class="panel costchart">
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--warn)"></i> дороже базлайна (платим за сигнал)</span>
+        <span><i class="swatch" style="background:var(--neutral-bar)"></i> ≈ как базлайн</span>
+        <span><i class="swatch" style="background:var(--good)"></i> дешевле базлайна (экономим)</span>
+      </div>
+
+      <div class="costrow">
+        <div class="rlabel"><div class="rname">01 confidence</div><div class="rbasis">вызовы · vs без контроля</div></div>
+        <div class="track"><div class="baseline"></div><div class="fill warn" style="width:96%">4.8×</div></div>
+      </div>
+      <div class="costrow">
+        <div class="rlabel"><div class="rname">02 routing</div><div class="rbasis">$ · vs всё-на-flash</div></div>
+        <div class="track"><div class="baseline"></div><div class="fill warn" style="width:82%">4.1×</div></div>
+      </div>
+      <div class="costrow">
+        <div class="rlabel"><div class="rname">03 decomposition</div><div class="rbasis">$ · вариант B vs A</div></div>
+        <div class="track"><div class="baseline"></div><div class="fill neutral" style="width:20%">0.99×</div></div>
+      </div>
+      <div class="costrow">
+        <div class="rlabel"><div class="rname">04 microfirst</div><div class="rbasis">вызовы · vs всегда-LLM</div></div>
+        <div class="track"><div class="baseline"></div><div class="fill good" style="width:6.4%">0.32×</div></div>
+      </div>
+
+      <p class="costfoot">
+        Серия читается слева направо как эволюция отношения к цене: <b>confidence</b> и <b>routing</b>
+        доплачивают за сигнал уверенности (×4–5), <b>decomposition</b> цену не меняет (покупает
+        надёжность, не деньги), а <b>microfirst</b> впервые её срезает — отсекая большинство входов
+        до LLM. Базис у столбцов разный (вызовы / $) и подписан; абсолютные $ между треками
+        несравнимы — сравниваем отношение к базлайну ВНУТРИ трека.
+      </p>
+    </div>
+  </section>
+
+  <!-- TRACK CARDS -->
+  <section>
+    <div class="sec-head">
+      <h2>Четыре трека по порядку</h2>
+      <span class="note">каждая ветка ответвлена от предыдущей — это слои одного каскада, не параллель</span>
+    </div>
+    <div class="tracks">
+
+      <!-- 01 -->
+      <article class="card">
+        <div>
+          <div class="num">01 — ИЗМЕРЕНИЕ</div>
+          <h3>confidence — уверенность без fine-tuning</h3>
+          <div class="branch">experiments/confidence · constraint → redundancy(K=3) → self-check</div>
+          <div class="qa">
+            <span class="axis-pill">ось: знать, когда не уверен</span>
+            <p class="q"><b>Вопрос:</b> насколько модель уверена в этом ответе?</p>
+          </div>
+          <p class="lesson">
+            <b>self-check дал 0 самостоятельных reject</b> — предельная польза ноль, цена реальна
+            (+1 вызов/вход); все UNSURE родила redundancy. «Ноль ошибок» недостижимо без потери части
+            верных ответов — порог строгости всегда компромисс.
+          </p>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="mk">статусы</div><div class="mv">85%<small> OK · 17/20</small></div></div>
+          <div class="metric"><div class="mk">цена контроля</div><div class="mv warn">×4.8<small> вызовов</small></div></div>
+          <div class="metric"><div class="mk">точн. majority</div><div class="mv">8<small>/10</small></div></div>
+          <div class="metric"><div class="mk">false reject</div><div class="mv warn">2<small>/10</small></div></div>
+        </div>
+      </article>
+
+      <!-- 02 -->
+      <article class="card">
+        <div>
+          <div class="num">02 — ВЫБОР МОДЕЛИ</div>
+          <h3>routing — flash по умолчанию, pro как fallback</h3>
+          <div class="branch">experiments/routing (от confidence) · триггеры length / constraint / confidence</div>
+          <div class="qa">
+            <span class="axis-pill">ось: эскалация по трудности</span>
+            <p class="q"><b>Вопрос:</b> какой моделью отвечать — дешёвой или дорогой?</p>
+          </div>
+          <p class="lesson">
+            Дешёвые эвристики на робастной flash <b>почти всегда молчат</b> (length/constraint — 0/20).
+            confidence — единственный, кто ловит семантическую неуверенность, но его проба стоит как
+            несколько ответов. Прод-вывод: дешёвые фильтры всегда, дорогую пробу выборочно.
+          </p>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="mk">эскалаций (conf.)</div><div class="mv">20%<small> · 4/20</small></div></div>
+          <div class="metric"><div class="mk">точн. routing</div><div class="mv good">8<small>/10 = pro</small></div></div>
+          <div class="metric"><div class="mk">точн. flash</div><div class="mv">7<small>/10</small></div></div>
+          <div class="metric"><div class="mk">цена routing</div><div class="mv warn">×4.1<small> vs flash</small></div></div>
+        </div>
+      </article>
+
+      <!-- 03 -->
+      <article class="card">
+        <div>
+          <div class="num">03 — СТРУКТУРА ЗАДАЧИ</div>
+          <h3>decomposition — monolithic vs multi-stage</h3>
+          <div class="branch">experiments/decomposition (от routing) · stage1 → stage2 → decide() в коде</div>
+          <div class="qa">
+            <span class="axis-pill">ось: разбить на этапы</span>
+            <p class="q"><b>Вопрос:</b> решать одним запросом или цепочкой этапов?</p>
+          </div>
+          <p class="lesson">
+            Декомпозиция покупает <b>надёжность / детерминизм / отлаживаемость</b>, а не цену (×0.99).
+            Инъекцию монолит пропустил и упал, цепочка — распознала и обезвредила. Жёсткую логику
+            маршрута вынесли в код: 0 нарушений by construction.
+          </p>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="mk">точность B / A</div><div class="mv good">8<small> / 7 · из 10</small></div></div>
+          <div class="metric"><div class="mk">инъекция</div><div class="mv">B <span class="tag good">поймал</span></div></div>
+          <div class="metric"><div class="mk">маршрут в коде</div><div class="mv good">0<small> наруш.</small></div></div>
+          <div class="metric"><div class="mk">цена B vs A</div><div class="mv">×0.99</div></div>
+        </div>
+      </article>
+
+      <!-- 04 -->
+      <article class="card">
+        <div>
+          <div class="num">04 — ОТСЕЧЕНИЕ ДО LLM</div>
+          <h3>microfirst — не-LLM фильтр впереди</h3>
+          <div class="branch">experiments/microfirst (от decomposition) · nomic nearest-centroid → flash на UNSURE</div>
+          <div class="qa">
+            <span class="axis-pill">ось: нужна ли вообще большая LLM</span>
+            <p class="q"><b>Вопрос:</b> нужна ли большая LLM для этого входа вообще?</p>
+          </div>
+          <p class="lesson">
+            Сигнал уверенности эмбеддинга — <b>margin (отрыв top1 от top2), а не абсолютная близость</b>:
+            nomic жмёт все косинусы в полосу ~0.7 (off-topic «борщ» дал top1=0.73). «Micro-model» —
+            спектр по цене: <b>LLM &gt; embedding &gt; TF-IDF ML</b>; бери самый дешёвый достаточный.
+          </p>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="mk">отсев микромоделью</div><div class="mv good">70%<small> · 14/20</small></div></div>
+          <div class="metric"><div class="mk">вызовы LLM</div><div class="mv good">−68%<small> · 7 vs 22</small></div></div>
+          <div class="metric"><div class="mk">точность</div><div class="mv good">10<small>/10 = базлайн</small></div></div>
+          <div class="metric"><div class="mk">инъекция</div><div class="mv">margin↓ <span class="tag good">не поддалась</span></div></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- CASCADE -->
+  <section>
+    <div class="sec-head">
+      <h2>Как это собирается в один прод-каскад</h2>
+      <span class="note">треки не конкурируют — это слои по возрастанию цены</span>
+    </div>
+    <div class="cascade">
+      <div class="stage">
+        <div class="st-name">↑ microfirst · дешёвый НЕ-LLM фильтр впереди всего</div>
+        <div class="st-body">
+          <b>Уверен</b> (большой margin) → ответ без единого вызова LLM (отсекает большинство).
+          <span class="lane">не уверен → пропускаем вход дальше, в LLM-часть каскада</span>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="st-name">decomposition · разбить на этапы, если задача многосоставная</div>
+        <div class="st-body">жёсткие правила — сразу в <b>код (decide())</b>, не в LLM.</div>
+      </div>
+      <div class="stage">
+        <div class="st-name">routing · на каждом LLM-этапе дёшево по умолчанию (flash)</div>
+        <div class="st-body">
+          дешёвые фильтры length/constraint — <b>всегда</b> (почти даром);
+          <span class="lane">дорогая проба уверенности (confidence) — выборочно, где цена ошибки высока</span>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="st-name">эскалация · не уверены → сильная модель (pro), иначе ответ flash</div>
+        <div class="st-body"><b>fail-closed</b> на каждом стыке: сбой/сомнение → безопасный исход (на человека), не наугад.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CROSS-CUTTING LESSONS -->
+  <section>
+    <div class="sec-head"><h2>Сквозные уроки</h2></div>
+    <div class="lessons">
+      <div class="lrow"><div class="ln">1</div><div class="lt"><b>Сила сигнала ∝ его цена.</b> Самый информативный сигнал (семантическая уверенность через self-consistency) — самый дорогой везде: ×4.8 в confidence, ×4.1 в routing.</div></div>
+      <div class="lrow"><div class="ln">2</div><div class="lt"><b>На робастной модели дешёвые проверки молчат.</b> flash + <span style="font-family:var(--mono);font-size:12px">response_format=json_object</span> почти всегда даёт валидный JSON → length/constraint = 0 срабатываний. Это страховка, не рабочая лошадка.</div></div>
+      <div class="lrow"><div class="ln">3</div><div class="lt"><b>Контроль качества всегда имеет двойную цену:</b> в деньгах/latency И в ложных отказах (false reject 2/10). «Ноль ошибок» покупается потерей части верных ответов — это выбор порога, не баг.</div></div>
+      <div class="lrow"><div class="ln">4</div><div class="lt"><b>Детерминированную логику — в код, не в LLM.</b> Всё, что выразимо условиями, считает Python: 0 стоимости, 0 нарушений. LLM оставляем только неформализуемое.</div></div>
+      <div class="lrow"><div class="ln">5</div><div class="lt"><b>Сигнал эмбеддинга — относительный, не абсолютный.</b> nomic плохо откалиброван по абсолютной шкале (всё в полосе ~0.7) → гейти по margin/рангу, а не по «магическому числу похожести».</div></div>
+    </div>
+  </section>
+
+  <!-- LIMITS -->
+  <section>
+    <div class="sec-head"><h2>Границы честности</h2></div>
+    <div class="limits">
+      <ul>
+        <li>Тест-сет мал (<b>20 входов</b>) — числа показывают направление, не строгую статистику.</li>
+        <li>Прайс — <b>приблизительные placeholder-константы</b>; относительные выводы (во сколько раз) держатся, точный биллинг — нет. Абсолютные $ между треками напрямую не сравнивать.</li>
+        <li>Пороги (напр. <b>TAU_MARGIN=0.03</b> в microfirst) калиброваны на прогоне — в проде берут на held-out val-set.</li>
+        <li>Из трёх способов Уровня 1 в microfirst реализован один (embedding); small-LLM и TF-IDF — разобраны концептуально в EXPLAINER.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    источник: experiments/{confidence,routing,decomposition,microfirst}/report.md · SUMMARY.md · сгенерировано из реальных прогонов Ollama + DeepSeek
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('themeBtn');
+    btn.addEventListener('click', function () {
+      var root = document.documentElement;
+      var cur = root.getAttribute('data-theme');
+      if (!cur) {
+        cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>
+</html>
