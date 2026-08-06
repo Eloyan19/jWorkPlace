@@ -16,6 +16,8 @@
 backend/.coverage
 frontend/test-results/
 frontend/playwright-report/
+test-results/
+playwright-report/
 
 # --- Python (backend / индексатор) ---
 __pycache__/
