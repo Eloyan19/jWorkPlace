@@ -31,6 +31,17 @@ ESCALATE_REPLY = (
     "Не нашёл ответа в документации по этому вопросу. Передаю обращение специалисту поддержки."
 )
 
+# Пост-фильтр инъекции контента (уровень 3, см. swarm-report/prompt-injection-level3-run.md):
+# _parse_and_validate проверяет ПРИСУТСТВИЕ quote в чанке, но не то, что answer не содержит
+# ДОБАВЛЕННЫХ нецитируемых артефактов. Red-team (P4) вживую пробил это фишинг-припиской с валидной
+# цитатой («подтвердите токен на https://…»). Fail-closed: URL или призыв ввести секрет, которых нет
+# в показанных фрагментах FAQ, → эскалация (в доверенном FAQ-корпусе легитимных URL нет).
+_URL_RE = re.compile(r"https?://[^\s)>\]\"'}]+", re.IGNORECASE)
+_SECRET_LURE_RE = re.compile(
+    r"(?i)(?:введите|укажите|подтвердите|отправьте|пришлите|вставьте|перейдите)[^.\n]{0,40}"
+    r"(?:токен|ключ|пароль|api[\s_-]?key|token|password|secret)"
+)
+
 # Слово "json" обязано присутствовать — требование DeepSeek response_format=json_object.
 SUPPORT_SYSTEM_PROMPT = (
     "Ты — ассистент поддержки пользователей сервиса jWorkPlace. Отвечай на вопрос пользователя "
@@ -124,6 +135,22 @@ def _parse_and_validate(raw: str, hits: list[dict]) -> tuple[str, list[dict]]:
     return answer, sources
 
 
+def _has_uncited_lure(answer: str, context_text: str) -> bool:
+    """True, если answer содержит URL или призыв ввести секрет, которых НЕТ в доверенном тексте
+    показанных фрагментов FAQ — признак инъекции контента в обход substring-валидации цитат.
+
+    Валидация `used` гарантирует лишь, что процитированный кусок есть в чанке; она не мешает модели
+    ДОПИСАТЬ к валидному ответу фишинговую строку. Здесь ловим именно дописанное: любой URL и любую
+    приманку секрета сверяем с контекстом (нормализованно) — не нашлось → инъекция (fail-closed)."""
+    ctx = _normalize(context_text)
+    for url in _URL_RE.findall(answer):
+        if url.rstrip(".,);\"'").lower() not in ctx:
+            return True
+    if _SECRET_LURE_RE.search(answer) and not _SECRET_LURE_RE.search(context_text):
+        return True
+    return False
+
+
 async def answer(question: str, ticket_ctx: dict | None = None) -> dict:
     """Ответить на вопрос поддержки. retrieve → гейт эскалации (без LLM) → генерация → валидация →
     downgrade в эскалацию при отсутствии валидных источников. Ответ клиенту прогоняем через redact."""
@@ -148,6 +175,13 @@ async def answer(question: str, ticket_ctx: dict | None = None) -> dict:
 
     if not sources or not ans:
         # Нет валидных источников — не отличить от галлюцинации → эскалация (без общих знаний модели).
+        return {"answer": ESCALATE_REPLY, "escalate": True, "sources": []}
+
+    # Пост-фильтр инъекции контента: ответ с валидной цитатой мог получить дописанную фишинг-строку
+    # (URL/приманку секрета вне FAQ). Fail-closed: такое — на человека, не пользователю.
+    context_text = "\n".join(h.get("text", "") for h in context_hits)
+    if _has_uncited_lure(ans, context_text):
+        logger.warning("support: нецитируемый URL/приманка секрета в ответе → эскалация (анти-инъекция)")
         return {"answer": ESCALATE_REPLY, "escalate": True, "sources": []}
 
     return {"answer": grounding.redact(ans), "escalate": False, "sources": sources}
