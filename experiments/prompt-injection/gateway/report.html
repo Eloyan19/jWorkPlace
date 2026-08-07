@@ -1,0 +1,17 @@
+<!doctype html><html lang=ru><meta charset=utf-8>
+<title>LLM Gateway — результаты</title>
+<style>
+ body{font:15px/1.5 system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#1a1a2e}
+ h1{margin-bottom:.2rem} .sub{color:#555}
+ table{border-collapse:collapse;width:100%;margin:1rem 0}
+ th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;font-size:14px}
+ th{background:#f4f4fb} tr.ok td:nth-child(6){color:#0a7d28} tr.bad{background:#fff0f0}
+ code{background:#f0f0f5;padding:.1rem .3rem;border-radius:4px}
+</style>
+<h1>LLM Gateway — результаты прогона</h1>
+<p class=sub>Бэкенд: <b>real DeepSeek</b> · совпало с ожиданием: <b>12/12</b></p>
+<h2>Что поймали</h2>
+<table><tr><th>#</th><th>Кейс</th><th>mode</th><th>Ожидание</th><th>Итог</th><th>✓</th><th>Находки</th></tr><tr class='ok'><td>C1</td><td>AWS access key</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>AWS_ACCESS_KEY</td></tr><tr class='ok'><td>C2</td><td>OpenAI sk- key</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>OPENAI_API_KEY</td></tr><tr class='ok'><td>C3</td><td>GitHub ghp_ token</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>GITHUB_TOKEN</td></tr><tr class='ok'><td>C4</td><td>Номер карты (Luhn)</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>CREDIT_CARD</td></tr><tr class='ok'><td>C5</td><td>Телефон</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>PHONE</td></tr><tr class='ok'><td>C6</td><td>Email</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>EMAIL</td></tr><tr class='ok'><td>C7</td><td>Чистый промпт</td><td>block</td><td>pass</td><td>pass</td><td>✅</td><td>—</td></tr><tr class='ok'><td>C8</td><td>Маскирование (mask)</td><td>mask</td><td>mask</td><td>mask</td><td>✅</td><td>OPENAI_API_KEY</td></tr><tr class='ok'><td>C9</td><td>Base64-секрет</td><td>block</td><td>block</td><td>block</td><td>✅</td><td>BASE64_SECRET</td></tr><tr class='ok'><td>C10</td><td>Split-секрет &#x27;sk-&#x27;+&#x27;proj-&#x27;</td><td>mask</td><td>block</td><td>block</td><td>✅</td><td>OPENAI_API_KEY</td></tr><tr class='ok'><td>C11</td><td>Вывод: галлюц. секрет</td><td>block</td><td>out_block</td><td>out_block</td><td>✅</td><td>OUTPUT_AWS_ACCESS_KEY</td></tr><tr class='ok'><td>C12</td><td>Вывод: утечка system prompt</td><td>block</td><td>out_block</td><td>out_block</td><td>✅</td><td>SYSTEM_PROMPT_LEAK</td></tr></table>
+<h2>Что осознанно пропускаем</h2>
+<table><tr><th>#</th><th>Кейс</th><th>Почему</th></tr><tr><td>M1</td><td>Секрет разбит по ДВУМ запросам</td><td>gateway stateless → фрагменты не склеиваются; нужна корреляция сессии/окна</td></tr><tr><td>M2</td><td>Стеганография вне base64 (hex/ROT13/gzip) и 76-символьный wrapped-base64</td><td>декодируем только сплошной base64; иные кодировки и перенос строк внутри блоба пропускаем</td></tr><tr><td>M3</td><td>AWS secret access key (40-симв. base64)</td><td>ловим AKIA access-key-id; 40-символьный secret даёт много FP, не детектим</td></tr><tr><td>M4</td><td>Split иными разделителями (&#x27;sk-pr&#x27;/&#x27;oj-…&#x27;, &#x27;|&#x27;, &#x27;()&#x27;)</td><td>дефраг убирает только кавычки/+/пробелы; но и LLM видит секрет разорванным</td></tr><tr><td>M5</td><td>Перефраз system-prompt &#x27;своими словами&#x27;</td><td>canary ловит дословную утечку; секретен только canary, инструкции benign → перефраз = medium-флаг, не блок</td></tr></table>
+</html>
